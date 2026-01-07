@@ -1,26 +1,49 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Fuel, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Fuel, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate login - will be replaced with Supabase auth
-    setTimeout(() => {
+
+    try {
+      if (isSignUp) {
+        const { error } = await signUp(email, password, fullName);
+        if (error) {
+          toast.error(error.message);
+        } else {
+          toast.success("Account created! You can now sign in.");
+          setIsSignUp(false);
+        }
+      } else {
+        const { error } = await signIn(email, password);
+        if (error) {
+          toast.error(error.message);
+        } else {
+          toast.success("Welcome back!");
+          navigate("/dashboard");
+        }
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred");
+    } finally {
       setIsLoading(false);
-      navigate("/dashboard");
-    }, 1000);
+    }
   };
 
   return (
@@ -95,13 +118,35 @@ export default function Login() {
           </div>
 
           <div className="text-center lg:text-left">
-            <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              {isSignUp ? "Create an account" : "Welcome back"}
+            </h2>
             <p className="mt-2 text-muted-foreground">
-              Sign in to your account to continue
+              {isSignUp
+                ? "Sign up to get started with FMS"
+                : "Sign in to your account to continue"}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="John Doe"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="pl-10"
+                    required={isSignUp}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
               <div className="relative">
@@ -121,12 +166,14 @@ export default function Login() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <button
-                  type="button"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot password?
-                </button>
+                {!isSignUp && (
+                  <button
+                    type="button"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -138,6 +185,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
                   required
+                  minLength={6}
                 />
                 <button
                   type="button"
@@ -158,21 +206,40 @@ export default function Login() {
               className="w-full h-12 text-base font-semibold"
               disabled={isLoading}
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isLoading
+                ? isSignUp
+                  ? "Creating account..."
+                  : "Signing in..."
+                : isSignUp
+                ? "Create account"
+                : "Sign in"}
             </Button>
           </form>
 
-          {/* Role Selector Preview */}
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-primary hover:underline font-medium"
+              >
+                {isSignUp ? "Sign in" : "Sign up"}
+              </button>
+            </p>
+          </div>
+
+          {/* Role Info */}
           <div className="pt-6 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-3">Quick access roles:</p>
+            <p className="text-sm text-muted-foreground mb-3">Available roles in FMS:</p>
             <div className="flex flex-wrap gap-2">
               {["Admin", "Supervisor", "Cashier", "Attendant"].map((role) => (
-                <button
+                <span
                   key={role}
-                  className="px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                  className="px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground"
                 >
                   {role}
-                </button>
+                </span>
               ))}
             </div>
           </div>
