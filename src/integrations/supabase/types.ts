@@ -14,16 +14,404 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attendant_assignments: {
+        Row: {
+          attendant_id: string
+          created_at: string
+          date: string
+          id: string
+          pump_id: string | null
+          shift_id: string
+        }
+        Insert: {
+          attendant_id: string
+          created_at?: string
+          date?: string
+          id?: string
+          pump_id?: string | null
+          shift_id: string
+        }
+        Update: {
+          attendant_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          pump_id?: string | null
+          shift_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendant_assignments_attendant_id_fkey"
+            columns: ["attendant_id"]
+            isOneToOne: false
+            referencedRelation: "attendants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendant_assignments_pump_id_fkey"
+            columns: ["pump_id"]
+            isOneToOne: false
+            referencedRelation: "pumps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendant_assignments_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendants: {
+        Row: {
+          branch_id: string
+          created_at: string
+          employee_id: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          phone: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          employee_id?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          employee_id?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendants_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      branches: {
+        Row: {
+          county: string
+          created_at: string
+          franchise_type: Database["public"]["Enums"]["franchise_type"]
+          id: string
+          is_active: boolean
+          location: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          county: string
+          created_at?: string
+          franchise_type: Database["public"]["Enums"]["franchise_type"]
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          county?: string
+          created_at?: string
+          franchise_type?: Database["public"]["Enums"]["franchise_type"]
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      islands: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          island_number: number
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          island_number: number
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          island_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "islands_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pumps: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          island_id: string | null
+          name: string
+          product_type: Database["public"]["Enums"]["product_type"]
+          totalizers_count: number
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          island_id?: string | null
+          name: string
+          product_type: Database["public"]["Enums"]["product_type"]
+          totalizers_count?: number
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          island_id?: string | null
+          name?: string
+          product_type?: Database["public"]["Enums"]["product_type"]
+          totalizers_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pumps_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pumps_island_id_fkey"
+            columns: ["island_id"]
+            isOneToOne: false
+            referencedRelation: "islands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          name: Database["public"]["Enums"]["shift_name"]
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          name: Database["public"]["Enums"]["shift_name"]
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          name?: Database["public"]["Enums"]["shift_name"]
+          start_time?: string
+        }
+        Relationships: []
+      }
+      tank_pump_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          pump_id: string
+          tank_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pump_id: string
+          tank_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pump_id?: string
+          tank_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tank_pump_assignments_pump_id_fkey"
+            columns: ["pump_id"]
+            isOneToOne: false
+            referencedRelation: "pumps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tank_pump_assignments_tank_id_fkey"
+            columns: ["tank_id"]
+            isOneToOne: false
+            referencedRelation: "tanks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tanks: {
+        Row: {
+          branch_id: string
+          capacity_usg: number
+          created_at: string
+          current_level_usg: number
+          id: string
+          is_active: boolean
+          name: string
+          product_type: Database["public"]["Enums"]["product_type"]
+          status: Database["public"]["Enums"]["tank_status"]
+          threshold_usg: number
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          capacity_usg: number
+          created_at?: string
+          current_level_usg?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          product_type: Database["public"]["Enums"]["product_type"]
+          status?: Database["public"]["Enums"]["tank_status"]
+          threshold_usg?: number
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          capacity_usg?: number
+          created_at?: string
+          current_level_usg?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          product_type?: Database["public"]["Enums"]["product_type"]
+          status?: Database["public"]["Enums"]["tank_status"]
+          threshold_usg?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tanks_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_branch: { Args: { _user_id: string }; Returns: string }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin_or_supervisor: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "supervisor" | "cashier" | "attendant"
+      franchise_type: "Financial Dealer" | "Young Dealer" | "COCO Dealer"
+      product_type: "PMS" | "AGO"
+      shift_name: "Morning" | "Afternoon" | "Night"
+      tank_status: "Full" | "Medium" | "Low" | "Critical"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +538,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "supervisor", "cashier", "attendant"],
+      franchise_type: ["Financial Dealer", "Young Dealer", "COCO Dealer"],
+      product_type: ["PMS", "AGO"],
+      shift_name: ["Morning", "Afternoon", "Night"],
+      tank_status: ["Full", "Medium", "Low", "Critical"],
+    },
   },
 } as const
