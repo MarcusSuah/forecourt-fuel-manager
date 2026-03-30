@@ -256,6 +256,102 @@ export type Database = {
           },
         ]
       }
+      shift_sales_reports: {
+        Row: {
+          attendant_id: string
+          branch_id: string
+          closing_meter: number
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          island_id: string | null
+          opening_meter: number
+          pump_id: string
+          rtt_usg: number
+          sales_liters: number | null
+          sales_usg: number | null
+          shift_id: string
+          total_sales_usd: number | null
+          unit_price_usd: number
+          updated_at: string
+        }
+        Insert: {
+          attendant_id: string
+          branch_id: string
+          closing_meter?: number
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          island_id?: string | null
+          opening_meter?: number
+          pump_id: string
+          rtt_usg?: number
+          sales_liters?: number | null
+          sales_usg?: number | null
+          shift_id: string
+          total_sales_usd?: number | null
+          unit_price_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          attendant_id?: string
+          branch_id?: string
+          closing_meter?: number
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          island_id?: string | null
+          opening_meter?: number
+          pump_id?: string
+          rtt_usg?: number
+          sales_liters?: number | null
+          sales_usg?: number | null
+          shift_id?: string
+          total_sales_usd?: number | null
+          unit_price_usd?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_sales_reports_attendant_id_fkey"
+            columns: ["attendant_id"]
+            isOneToOne: false
+            referencedRelation: "attendants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_sales_reports_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_sales_reports_island_id_fkey"
+            columns: ["island_id"]
+            isOneToOne: false
+            referencedRelation: "islands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_sales_reports_pump_id_fkey"
+            columns: ["pump_id"]
+            isOneToOne: false
+            referencedRelation: "pumps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_sales_reports_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shifts: {
         Row: {
           created_at: string
