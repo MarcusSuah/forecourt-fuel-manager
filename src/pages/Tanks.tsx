@@ -1,7 +1,10 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { TankCard } from "@/components/dashboard/TankCard";
 import { Button } from "@/components/ui/button";
-import { Plus, Filter, Download } from "lucide-react";
+import { Plus, Download } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,94 +12,72 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const tanks = [
-  {
-    name: "PMS-TANK-1",
-    product: "PMS" as const,
-    capacity: 20000,
-    currentLevel: 16500,
-    branch: "Monrovia Central",
-    lastUpdated: "10 min ago",
-  },
-  {
-    name: "PMS-TANK-2",
-    product: "PMS" as const,
-    capacity: 18000,
-    currentLevel: 9800,
-    branch: "Monrovia Central",
-    lastUpdated: "10 min ago",
-  },
-  {
-    name: "AGO-TANK-1",
-    product: "AGO" as const,
-    capacity: 15000,
-    currentLevel: 4200,
-    branch: "Monrovia Central",
-    lastUpdated: "10 min ago",
-  },
-  {
-    name: "PMS-TANK-3",
-    product: "PMS" as const,
-    capacity: 22000,
-    currentLevel: 19800,
-    branch: "Buchanan Station",
-    lastUpdated: "25 min ago",
-  },
-  {
-    name: "AGO-TANK-2",
-    product: "AGO" as const,
-    capacity: 12000,
-    currentLevel: 10200,
-    branch: "Buchanan Station",
-    lastUpdated: "25 min ago",
-  },
-  {
-    name: "PMS-TANK-4",
-    product: "PMS" as const,
-    capacity: 16000,
-    currentLevel: 5600,
-    branch: "Gbarnga Station",
-    lastUpdated: "5 min ago",
-  },
-  {
-    name: "AGO-TANK-3",
-    product: "AGO" as const,
-    capacity: 14000,
-    currentLevel: 12600,
-    branch: "Gbarnga Station",
-    lastUpdated: "5 min ago",
-  },
-  {
-    name: "PMS-TANK-5",
-    product: "PMS" as const,
-    capacity: 20000,
-    currentLevel: 3200,
-    branch: "Kakata Station",
-    lastUpdated: "15 min ago",
-  },
-];
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Tanks() {
+  const [branchFilter, setBranchFilter] = useState("all");
+  const [productFilter, setProductFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: branches } = useQuery({
+    queryKey: ["branches"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: tanks, isLoading } = useQuery({
+    queryKey: ["tanks"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tanks")
+        .select("*, branches(name)")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const filteredTanks = (tanks ?? []).filter((t) => {
+    if (branchFilter !== "all" && t.branch_id !== branchFilter) return false;
+    if (productFilter !== "all" && t.product_type !== productFilter.toUpperCase()) return false;
+    if (statusFilter !== "all") {
+      const pct = Number(t.current_level_usg) / Number(t.capacity_usg);
+      if (statusFilter === "full" && pct < 0.7) return false;
+      if (statusFilter === "medium" && (pct < 0.3 || pct >= 0.7)) return false;
+      if (statusFilter === "low" && pct >= 0.3) return false;
+    }
+    return true;
+  });
+
+  const getTimeSince = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ago`;
+  };
+
   return (
     <AppLayout title="Tank Management" subtitle="Monitor and manage fuel tank levels">
-      {/* Actions Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Select defaultValue="all">
-            <SelectTrigger className="w-44 bg-card">
+          <Select value={branchFilter} onValueChange={setBranchFilter}>
+            <SelectTrigger className="w-52 bg-card">
               <SelectValue placeholder="All Branches" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Branches</SelectItem>
-              <SelectItem value="monrovia">Monrovia Central</SelectItem>
-              <SelectItem value="buchanan">Buchanan Station</SelectItem>
-              <SelectItem value="gbarnga">Gbarnga Station</SelectItem>
-              <SelectItem value="kakata">Kakata Station</SelectItem>
+              {branches?.map((b) => (
+                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
-          <Select defaultValue="all">
+          <Select value={productFilter} onValueChange={setProductFilter}>
             <SelectTrigger className="w-32 bg-card">
               <SelectValue placeholder="Product" />
             </SelectTrigger>
@@ -107,7 +88,7 @@ export default function Tanks() {
             </SelectContent>
           </Select>
 
-          <Select defaultValue="all">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-36 bg-card">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -136,19 +117,19 @@ export default function Tanks() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="metric-card">
           <p className="text-sm text-muted-foreground">Total Tanks</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{tanks.length}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{filteredTanks.length}</p>
         </div>
         <div className="metric-card border-success/30">
           <p className="text-sm text-muted-foreground">Optimal (70%+)</p>
           <p className="text-2xl font-bold text-success mt-1">
-            {tanks.filter((t) => (t.currentLevel / t.capacity) >= 0.7).length}
+            {filteredTanks.filter((t) => Number(t.current_level_usg) / Number(t.capacity_usg) >= 0.7).length}
           </p>
         </div>
         <div className="metric-card border-warning/30">
           <p className="text-sm text-muted-foreground">Moderate (30-70%)</p>
           <p className="text-2xl font-bold text-warning mt-1">
-            {tanks.filter((t) => {
-              const pct = t.currentLevel / t.capacity;
+            {filteredTanks.filter((t) => {
+              const pct = Number(t.current_level_usg) / Number(t.capacity_usg);
               return pct >= 0.3 && pct < 0.7;
             }).length}
           </p>
@@ -156,17 +137,33 @@ export default function Tanks() {
         <div className="metric-card border-destructive/30">
           <p className="text-sm text-muted-foreground">Low Stock (&lt;30%)</p>
           <p className="text-2xl font-bold text-destructive mt-1">
-            {tanks.filter((t) => (t.currentLevel / t.capacity) < 0.3).length}
+            {filteredTanks.filter((t) => Number(t.current_level_usg) / Number(t.capacity_usg) < 0.3).length}
           </p>
         </div>
       </div>
 
       {/* Tank Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {tanks.map((tank) => (
-          <TankCard key={tank.name} {...tank} />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-72 rounded-xl" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredTanks.map((tank) => (
+            <TankCard
+              key={tank.id}
+              name={tank.name}
+              product={tank.product_type}
+              capacity={Number(tank.capacity_usg)}
+              currentLevel={Number(tank.current_level_usg)}
+              branch={(tank.branches as any)?.name ?? "Unknown"}
+              lastUpdated={getTimeSince(tank.updated_at)}
+            />
+          ))}
+        </div>
+      )}
     </AppLayout>
   );
 }
