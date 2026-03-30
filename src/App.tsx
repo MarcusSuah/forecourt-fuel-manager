@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Tanks from "./pages/Tanks";
+import SalesEntry from "./pages/SalesEntry";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,7 +53,7 @@ const App = () => (
               path="/sales"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <SalesEntry />
                 </ProtectedRoute>
               }
             />
