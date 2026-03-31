@@ -72,7 +72,7 @@ const App = () => (
               path="/stock"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <StockControl />
                 </ProtectedRoute>
               }
             />
