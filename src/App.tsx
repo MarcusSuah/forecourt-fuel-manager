@@ -64,7 +64,7 @@ const App = () => (
               path="/cash"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <CashReports />
                 </ProtectedRoute>
               }
             />
