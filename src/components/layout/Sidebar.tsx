@@ -29,7 +29,7 @@ const navigation = [
   { name: "Reports", href: "/reports", icon: FileBarChart },
   { name: "Attendants", href: "/attendants", icon: Users },
   { name: "Analytics", href: "/analytics", icon: TrendingUp },
-  { name: "Admin", href: "/admin", icon: Settings },
+  { name: "Admin", href: "/admin", icon: ShieldCheck },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
