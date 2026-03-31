@@ -9,6 +9,9 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Tanks from "./pages/Tanks";
 import SalesEntry from "./pages/SalesEntry";
+import CashReports from "./pages/CashReports";
+import StockControl from "./pages/StockControl";
+import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,7 +64,7 @@ const App = () => (
               path="/cash"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <CashReports />
                 </ProtectedRoute>
               }
             />
@@ -69,7 +72,7 @@ const App = () => (
               path="/stock"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <StockControl />
                 </ProtectedRoute>
               }
             />
@@ -94,6 +97,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminUsers />
                 </ProtectedRoute>
               }
             />
