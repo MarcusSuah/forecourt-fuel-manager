@@ -140,6 +140,76 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_deposits: {
+        Row: {
+          amount: number
+          amount_usd: number | null
+          attendant_id: string | null
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          date: string
+          deposit_type: string
+          exchange_rate: number | null
+          id: string
+          notes: string | null
+          shift_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          amount_usd?: number | null
+          attendant_id?: string | null
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          deposit_type: string
+          exchange_rate?: number | null
+          id?: string
+          notes?: string | null
+          shift_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          amount_usd?: number | null
+          attendant_id?: string | null
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          deposit_type?: string
+          exchange_rate?: number | null
+          id?: string
+          notes?: string | null
+          shift_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_deposits_attendant_id_fkey"
+            columns: ["attendant_id"]
+            isOneToOne: false
+            referencedRelation: "attendants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_deposits_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_deposits_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       islands: {
         Row: {
           branch_id: string
@@ -375,6 +445,70 @@ export type Database = {
           start_time?: string
         }
         Relationships: []
+      }
+      stock_readings: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          notes: string | null
+          physical_level_usg: number
+          shift_id: string | null
+          tank_id: string
+          theoretical_level_usg: number
+          variance_usg: number | null
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          physical_level_usg?: number
+          shift_id?: string | null
+          tank_id: string
+          theoretical_level_usg?: number
+          variance_usg?: number | null
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          physical_level_usg?: number
+          shift_id?: string | null
+          tank_id?: string
+          theoretical_level_usg?: number
+          variance_usg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_readings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_readings_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_readings_tank_id_fkey"
+            columns: ["tank_id"]
+            isOneToOne: false
+            referencedRelation: "tanks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tank_pump_assignments: {
         Row: {
