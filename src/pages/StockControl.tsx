@@ -36,7 +36,7 @@ export default function StockControl() {
     queryFn: async () => {
       let q = supabase.from("tanks").select("*, branches(name)").eq("is_active", true);
       if (branchFilter !== "all") q = q.eq("branch_id", branchFilter);
-      if (productFilter !== "all") q = q.eq("product_type", productFilter);
+      if (productFilter !== "all") q = q.eq("product_type", productFilter as "PMS" | "AGO");
       const { data, error } = await q.order("name");
       if (error) throw error;
       return data;
