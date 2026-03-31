@@ -14,6 +14,7 @@ import {
   Droplets,
   TrendingUp,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
