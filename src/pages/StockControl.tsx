@@ -244,6 +244,7 @@ export default function StockControl() {
               tankAnalysis.map(t => [t.name, t.branchName, t.product_type, Number(t.capacity_usg), t.physicalLevel, t.theoreticalLevel, t.variance.toFixed(1), t.variancePct.toFixed(2) + "%", t.tankThroughput, Math.abs(t.variancePct) > 1 ? (t.variance < 0 ? "Loss" : "Gain") : "Normal"])
             );
           }}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
