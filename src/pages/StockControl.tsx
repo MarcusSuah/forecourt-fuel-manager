@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Fuel, TrendingDown, TrendingUp, AlertTriangle, BarChart3 } from "lucide-react";
+import { Fuel, TrendingDown, TrendingUp, AlertTriangle, BarChart3, Download } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
 
