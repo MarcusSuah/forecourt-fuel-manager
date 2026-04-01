@@ -15,7 +15,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Save, Trash2, Wallet, DollarSign, Banknote } from "lucide-react";
+import { Plus, Save, Trash2, Wallet, DollarSign, Banknote, Download } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
