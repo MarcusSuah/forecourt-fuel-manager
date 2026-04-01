@@ -372,7 +372,16 @@ export default function SalesEntry() {
       {globalBranch && globalShift && todaysEntries && todaysEntries.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Submitted Entries for {format(new Date(date), "MMM dd, yyyy")}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Submitted Entries for {format(new Date(date), "MMM dd, yyyy")}</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => {
+                if (!todaysEntries) return;
+                downloadCSV(`sales-entries-${date}.csv`,
+                  ["Attendant", "Pump", "Product", "Opening", "Closing", "RTT", "Sales (USG)", "Price", "Total ($)"],
+                  todaysEntries.map(e => [(e.attendants as any)?.full_name, (e.pumps as any)?.name, (e.pumps as any)?.product_type, Number(e.opening_meter), Number(e.closing_meter), Number(e.rtt_usg), Number(e.sales_usg), Number(e.unit_price_usd), Number(e.total_sales_usd).toFixed(2)])
+                );
+              }}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>

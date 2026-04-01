@@ -237,6 +237,12 @@ export default function StockControl() {
             <Fuel className="h-5 w-5 text-primary" />
             Stock Control Detail — {format(new Date(dateFrom), "MMM dd")} to {format(new Date(dateTo), "MMM dd, yyyy")}
           </CardTitle>
+          <Button variant="outline" size="sm" onClick={() => {
+            downloadCSV(`stock-control-${dateFrom}-to-${dateTo}.csv`,
+              ["Tank", "Branch", "Product", "Capacity", "Physical Stock", "Theoretical Stock", "Variance", "Var %", "Throughput", "Status"],
+              tankAnalysis.map(t => [t.name, t.branchName, t.product_type, Number(t.capacity_usg), t.physicalLevel, t.theoreticalLevel, t.variance.toFixed(1), t.variancePct.toFixed(2) + "%", t.tankThroughput, Math.abs(t.variancePct) > 1 ? (t.variance < 0 ? "Loss" : "Gain") : "Normal"])
+            );
+          }}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
