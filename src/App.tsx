@@ -50,7 +50,7 @@ const App = () => (
               path="/branches"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Branches />
                 </ProtectedRoute>
               }
             />
