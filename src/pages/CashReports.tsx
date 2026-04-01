@@ -15,7 +15,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Save, Trash2, Wallet, DollarSign, Banknote } from "lucide-react";
+import { Plus, Save, Trash2, Wallet, DollarSign, Banknote, Download } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -324,7 +325,16 @@ export default function CashReports() {
       {todaysDeposits && todaysDeposits.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Submitted Deposits — {format(new Date(date), "MMM dd, yyyy")}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Submitted Deposits — {format(new Date(date), "MMM dd, yyyy")}</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => {
+                if (!todaysDeposits) return;
+                downloadCSV(`cash-deposits-${date}.csv`,
+                  ["Attendant", "Type", "Amount", "Rate", "USD Equiv.", "Notes"],
+                  todaysDeposits.map(d => [(d.attendants as any)?.full_name || "—", d.deposit_type, Number(d.amount), d.deposit_type === "LRD" ? Number(d.exchange_rate) : "—", Number(d.amount_usd).toFixed(2), d.notes || ""])
+                );
+              }}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">

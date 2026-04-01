@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Fuel, TrendingDown, TrendingUp, AlertTriangle, BarChart3 } from "lucide-react";
+import { Fuel, TrendingDown, TrendingUp, AlertTriangle, BarChart3, Download } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
 
@@ -231,10 +233,18 @@ export default function StockControl() {
       {/* Tank Stock Detail Table */}
       <Card>
         <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
             <Fuel className="h-5 w-5 text-primary" />
             Stock Control Detail — {format(new Date(dateFrom), "MMM dd")} to {format(new Date(dateTo), "MMM dd, yyyy")}
           </CardTitle>
+          <Button variant="outline" size="sm" onClick={() => {
+            downloadCSV(`stock-control-${dateFrom}-to-${dateTo}.csv`,
+              ["Tank", "Branch", "Product", "Capacity", "Physical Stock", "Theoretical Stock", "Variance", "Var %", "Throughput", "Status"],
+              tankAnalysis.map(t => [t.name, t.branchName, t.product_type, Number(t.capacity_usg), t.physicalLevel, t.theoreticalLevel, t.variance.toFixed(1), t.variancePct.toFixed(2) + "%", t.tankThroughput, Math.abs(t.variancePct) > 1 ? (t.variance < 0 ? "Loss" : "Gain") : "Normal"])
+            );
+          }}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>

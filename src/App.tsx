@@ -11,6 +11,7 @@ import Tanks from "./pages/Tanks";
 import SalesEntry from "./pages/SalesEntry";
 import CashReports from "./pages/CashReports";
 import StockControl from "./pages/StockControl";
+import Reports from "./pages/Reports";
 import AdminUsers from "./pages/AdminUsers";
 import Attendants from "./pages/Attendants";
 import Branches from "./pages/Branches";
@@ -82,7 +83,7 @@ const App = () => (
               path="/reports"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Reports />
                 </ProtectedRoute>
               }
             />
