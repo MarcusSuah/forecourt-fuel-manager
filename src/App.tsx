@@ -12,6 +12,8 @@ import SalesEntry from "./pages/SalesEntry";
 import CashReports from "./pages/CashReports";
 import StockControl from "./pages/StockControl";
 import AdminUsers from "./pages/AdminUsers";
+import Attendants from "./pages/Attendants";
+import Branches from "./pages/Branches";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
