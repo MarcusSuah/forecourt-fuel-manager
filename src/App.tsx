@@ -90,7 +90,7 @@ const App = () => (
               path="/attendants"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <Attendants />
                 </ProtectedRoute>
               }
             />
