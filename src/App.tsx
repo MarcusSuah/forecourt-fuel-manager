@@ -16,6 +16,7 @@ import AdminUsers from "./pages/AdminUsers";
 import Attendants from "./pages/Attendants";
 import Branches from "./pages/Branches";
 import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
