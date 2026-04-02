@@ -147,7 +147,7 @@ export default function Analytics() {
     const map = new Map<string, { name: string; revenue: number; transactions: number }>();
     salesData.forEach(s => {
       const name = (s.attendants as any)?.full_name || "Unknown";
-      const key = s.attendant_id || name;
+      const key = name;
       if (!map.has(key)) map.set(key, { name, revenue: 0, transactions: 0 });
       const a = map.get(key)!;
       a.revenue += Number(s.total_sales_usd) || 0;
