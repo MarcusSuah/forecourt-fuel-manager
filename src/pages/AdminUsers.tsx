@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -15,10 +14,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Shield, UserPlus, Edit2, Trash2, Users } from "lucide-react";
+import { Shield, Edit2, Trash2, Users, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Constants } from "@/integrations/supabase/types";
 
@@ -27,6 +26,13 @@ const roleColors: Record<string, string> = {
   supervisor: "bg-primary/15 text-primary border-primary/30",
   cashier: "bg-success/15 text-success border-success/30",
   attendant: "bg-accent/15 text-accent border-accent/30",
+};
+
+const roleDescriptions: Record<string, string> = {
+  admin: "Full access to all modules, user management, and settings",
+  supervisor: "Manage branches, attendants, sales, cash, and stock",
+  cashier: "Record cash deposits and view sales reports",
+  attendant: "Enter shift sales and view own assignments",
 };
 
 export default function AdminUsers() {
@@ -43,10 +49,7 @@ export default function AdminUsers() {
   const { data: profiles, isLoading } = useQuery({
     queryKey: ["all-profiles"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("full_name");
+      const { data, error } = await supabase.from("profiles").select("*").order("full_name");
       if (error) throw error;
       return data;
     },
@@ -104,11 +107,7 @@ export default function AdminUsers() {
         const { error } = await supabase.from("attendants").update({ branch_id: branchId }).eq("user_id", userId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("attendants").insert({
-          user_id: userId,
-          branch_id: branchId,
-          full_name: fullName,
-        });
+        const { error } = await supabase.from("attendants").insert({ user_id: userId, branch_id: branchId, full_name: fullName });
         if (error) throw error;
       }
     },
@@ -170,23 +169,26 @@ export default function AdminUsers() {
 
   return (
     <AppLayout title="User Management" subtitle="Manage roles and branch assignments">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {/* Role Cards with descriptions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {Constants.public.Enums.app_role.map((role) => {
           const count = userRoles?.filter(r => r.role === role).length || 0;
           return (
-            <Card key={role}>
-              <CardContent className="pt-4 text-center">
-                <Badge variant="outline" className={cn("mb-2", roleColors[role])}>{role}</Badge>
-                <p className="text-2xl font-bold">{count}</p>
+            <Card key={role} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFilterRole(filterRole === role ? "all" : role)}>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <Badge variant="outline" className={cn("capitalize", roleColors[role])}>{role}</Badge>
+                  <span className="text-2xl font-bold">{count}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{roleDescriptions[role]}</p>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Filter */}
-      <Card className="mb-6">
+      {/* User Table */}
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -273,6 +275,9 @@ export default function AdminUsers() {
                   ))}
                 </SelectContent>
               </Select>
+              {editRole && (
+                <p className="text-xs text-muted-foreground">{roleDescriptions[editRole]}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Branch Assignment</Label>
@@ -290,15 +295,5 @@ export default function AdminUsers() {
         </DialogContent>
       </Dialog>
     </AppLayout>
-  );
-}
-
-function Save(props: any) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>
-      <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/>
-      <path d="M7 3v4a1 1 0 0 0 1 1h7"/>
-    </svg>
   );
 }

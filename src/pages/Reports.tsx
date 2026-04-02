@@ -16,8 +16,32 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileBarChart, Download, Fuel, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval, parseISO } from "date-fns";
+import { format, subDays, eachDayOfInterval, parseISO } from "date-fns";
 import { downloadCSV } from "@/lib/csv-export";
+import {
+  ChartContainer, ChartTooltip, ChartTooltipContent,
+} from "@/components/ui/chart";
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer,
+} from "recharts";
+
+const salesChartConfig = {
+  pms: { label: "PMS", color: "hsl(var(--primary))" },
+  ago: { label: "AGO", color: "hsl(var(--accent))" },
+};
+
+const revenueChartConfig = {
+  sales: { label: "Sales ($)", color: "hsl(var(--primary))" },
+  cash: { label: "Cash ($)", color: "hsl(var(--success))" },
+};
+
+const PIE_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "hsl(var(--success))",
+  "hsl(var(--warning))",
+  "hsl(var(--destructive))",
+];
 
 export default function Reports() {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), "yyyy-MM-dd"));
@@ -61,7 +85,6 @@ export default function Reports() {
     },
   });
 
-  // Daily summary
   const dailySummary = useMemo(() => {
     if (!salesData && !cashData) return [];
     const days = eachDayOfInterval({ start: parseISO(dateFrom), end: parseISO(dateTo) });
@@ -74,11 +97,10 @@ export default function Reports() {
       const totalSalesUsd = daySales.reduce((sum, s) => sum + (Number(s.total_sales_usd) || 0), 0);
       const totalCashUsd = dayCash.reduce((sum, c) => sum + (Number(c.amount_usd) || 0), 0);
       const variance = totalCashUsd - totalSalesUsd;
-      return { date: dateStr, displayDate: format(day, "MMM dd, EEE"), pmsUsg, agoUsg, totalUsg: pmsUsg + agoUsg, totalSalesUsd, totalCashUsd, variance };
+      return { date: dateStr, displayDate: format(day, "MMM dd"), pmsUsg, agoUsg, totalUsg: pmsUsg + agoUsg, totalSalesUsd, totalCashUsd, variance };
     });
   }, [salesData, cashData, dateFrom, dateTo]);
 
-  // Branch summary
   const branchSummary = useMemo(() => {
     if (!salesData && !cashData) return [];
     const branchMap = new Map<string, { name: string; pmsUsg: number; agoUsg: number; salesUsd: number; cashUsd: number }>();
@@ -108,6 +130,12 @@ export default function Reports() {
     cashUsd: dailySummary.reduce((s, d) => s + d.totalCashUsd, 0),
     variance: dailySummary.reduce((s, d) => s + d.variance, 0),
   }), [dailySummary]);
+
+  // Pie data for product mix
+  const productMixData = useMemo(() => [
+    { name: "PMS", value: grandTotals.pmsUsg },
+    { name: "AGO", value: grandTotals.agoUsg },
+  ].filter(d => d.value > 0), [grandTotals]);
 
   const exportDailyCSV = () => {
     downloadCSV(`daily-report-${dateFrom}-to-${dateTo}.csv`,
@@ -214,7 +242,70 @@ export default function Reports() {
         </Card>
       </div>
 
-      {/* Tabs */}
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Sales Volume Trend */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Daily Sales Volume (USG)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={salesChartConfig} className="h-[280px] w-full">
+              <BarChart data={dailySummary}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
+                <XAxis dataKey="displayDate" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="pmsUsg" name="pms" fill="var(--color-pms)" radius={[4, 4, 0, 0]} stackId="fuel" />
+                <Bar dataKey="agoUsg" name="ago" fill="var(--color-ago)" radius={[4, 4, 0, 0]} stackId="fuel" />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Product Mix Pie */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Product Mix</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center">
+            {productMixData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={productMixData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    {productMixData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-muted-foreground text-sm py-12">No data</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenue Trend Line */}
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Revenue vs Cash Collected ($)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={revenueChartConfig} className="h-[260px] w-full">
+            <LineChart data={dailySummary}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
+              <XAxis dataKey="displayDate" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+              <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Line type="monotone" dataKey="totalSalesUsd" name="sales" stroke="var(--color-sales)" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="totalCashUsd" name="cash" stroke="var(--color-cash)" strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Data Tables */}
       <Tabs defaultValue="daily">
         <TabsList className="mb-4">
           <TabsTrigger value="daily">Daily Summary</TabsTrigger>
