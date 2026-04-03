@@ -18,6 +18,7 @@ import { FileBarChart, Download, Fuel, DollarSign, TrendingUp, TrendingDown } fr
 import { cn } from "@/lib/utils";
 import { format, subDays, eachDayOfInterval, parseISO } from "date-fns";
 import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
 } from "@/components/ui/chart";
