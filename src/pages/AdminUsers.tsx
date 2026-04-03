@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,7 +11,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -25,7 +25,7 @@ const roleColors: Record<string, string> = {
   admin: "bg-destructive/15 text-destructive border-destructive/30",
   supervisor: "bg-primary/15 text-primary border-primary/30",
   cashier: "bg-success/15 text-success border-success/30",
-  attendant: "bg-accent/15 text-accent border-accent/30",
+  attendant: "bg-accent/15 text-accent-foreground border-accent/30",
 };
 
 const roleDescriptions: Record<string, string> = {
@@ -43,6 +43,31 @@ export default function AdminUsers() {
   const [editRole, setEditRole] = useState("");
   const [editBranch, setEditBranch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Auto-assign admin role if current user has no role
+  useEffect(() => {
+    if (user && !user.role) {
+      const assignAdmin = async () => {
+        const { data: existing } = await supabase
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!existing) {
+          const { error } = await supabase.from("user_roles").insert({
+            user_id: user.id,
+            role: "admin" as any,
+          });
+          if (!error) {
+            toast.success("You have been assigned the Admin role");
+            queryClient.invalidateQueries({ queryKey: ["all-user-roles"] });
+            window.location.reload();
+          }
+        }
+      };
+      assignAdmin();
+    }
+  }, [user]);
 
   const isAdmin = user?.role === "admin";
 
@@ -169,18 +194,30 @@ export default function AdminUsers() {
 
   return (
     <AppLayout title="User Management" subtitle="Manage roles and branch assignments">
-      {/* Role Cards with descriptions */}
+      {/* Role Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {Constants.public.Enums.app_role.map((role) => {
           const count = userRoles?.filter(r => r.role === role).length || 0;
+          const isSelected = filterRole === role;
           return (
-            <Card key={role} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFilterRole(filterRole === role ? "all" : role)}>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-2">
+            <Card
+              key={role}
+              className={cn(
+                "cursor-pointer hover:shadow-md transition-all",
+                isSelected && "ring-2 ring-primary"
+              )}
+              onClick={() => setFilterRole(isSelected ? "all" : role)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
                   <Badge variant="outline" className={cn("capitalize", roleColors[role])}>{role}</Badge>
                   <span className="text-2xl font-bold">{count}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">{roleDescriptions[role]}</p>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <CardDescription className="text-xs leading-relaxed">
+                  {roleDescriptions[role]}
+                </CardDescription>
               </CardContent>
             </Card>
           );
@@ -239,11 +276,11 @@ export default function AdminUsers() {
                       <TableCell>{(branch?.branches as any)?.name || "—"}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p.user_id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p.user_id)} title="Edit role">
                             <Edit2 className="h-4 w-4" />
                           </Button>
                           {role && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteRoleMutation.mutate(p.user_id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteRoleMutation.mutate(p.user_id)} title="Remove role">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}

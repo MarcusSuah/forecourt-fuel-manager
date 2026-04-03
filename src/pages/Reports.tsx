@@ -14,10 +14,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileBarChart, Download, Fuel, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
+import { FileBarChart, Download, Fuel, DollarSign, TrendingUp, TrendingDown, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, eachDayOfInterval, parseISO } from "date-fns";
 import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
 } from "@/components/ui/chart";
@@ -148,6 +149,30 @@ export default function Reports() {
     downloadCSV(`branch-report-${dateFrom}-to-${dateTo}.csv`,
       ["Branch", "PMS (USG)", "AGO (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
       branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), b.salesUsd.toFixed(2), b.cashUsd.toFixed(2), b.variance.toFixed(2)])
+    );
+  };
+
+  const exportDailyPDF = () => {
+    exportTableToPDF(
+      "Daily Sales Report",
+      `${dateFrom} to ${dateTo}`,
+      ["Date", "PMS (USG)", "AGO (USG)", "Total (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
+      dailySummary.map(d => [d.displayDate, d.pmsUsg.toFixed(1), d.agoUsg.toFixed(1), d.totalUsg.toFixed(1), `$${d.totalSalesUsd.toFixed(2)}`, `$${d.totalCashUsd.toFixed(2)}`, `${d.variance >= 0 ? "+" : ""}$${d.variance.toFixed(2)}`]),
+      [
+        { label: "Total Volume", value: `${grandTotals.totalUsg.toLocaleString(undefined, { maximumFractionDigits: 0 })} USG` },
+        { label: "Total Sales", value: `$${grandTotals.salesUsd.toFixed(2)}` },
+        { label: "Total Cash", value: `$${grandTotals.cashUsd.toFixed(2)}` },
+        { label: "Variance", value: `${grandTotals.variance >= 0 ? "+" : ""}$${grandTotals.variance.toFixed(2)}` },
+      ]
+    );
+  };
+
+  const exportBranchPDF = () => {
+    exportTableToPDF(
+      "Branch Performance Report",
+      `${dateFrom} to ${dateTo}`,
+      ["Branch", "PMS (USG)", "AGO (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
+      branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), `$${b.salesUsd.toFixed(2)}`, `$${b.cashUsd.toFixed(2)}`, `${b.variance >= 0 ? "+" : ""}$${b.variance.toFixed(2)}`])
     );
   };
 
@@ -317,7 +342,10 @@ export default function Reports() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Daily Summary — {format(parseISO(dateFrom), "MMM dd")} to {format(parseISO(dateTo), "MMM dd, yyyy")}</CardTitle>
-                <Button variant="outline" size="sm" onClick={exportDailyCSV}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportDailyPDF}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
+                  <Button variant="outline" size="sm" onClick={exportDailyCSV}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-x-auto">
@@ -375,7 +403,10 @@ export default function Reports() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Branch Performance Summary</CardTitle>
-                <Button variant="outline" size="sm" onClick={exportBranchCSV}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportBranchPDF}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
+                  <Button variant="outline" size="sm" onClick={exportBranchCSV}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-x-auto">
