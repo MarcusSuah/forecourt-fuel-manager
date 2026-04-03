@@ -1,20 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Fuel,
-  Users,
-  Building2,
-  Receipt,
-  Wallet,
-  FileBarChart,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Droplets,
-  TrendingUp,
-  LogOut,
-  ShieldCheck,
+  LayoutDashboard, Fuel, Users, Building2, Receipt, Wallet,
+  FileBarChart, Settings, ChevronLeft, ChevronRight, Droplets,
+  TrendingUp, LogOut, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,7 +22,11 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ onNavigate }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -44,14 +37,8 @@ export function Sidebar() {
     navigate("/login");
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const getInitials = (name: string) =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <aside
@@ -60,7 +47,6 @@ export function Sidebar() {
         collapsed ? "w-20" : "w-64"
       )}
     >
-      {/* Logo */}
       <div className="flex h-20 items-center justify-between px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
@@ -75,13 +61,12 @@ export function Sidebar() {
         </div>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+          className="p-1.5 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors hidden lg:block"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3">
         <ul className="space-y-1">
           {navigation.map((item) => {
@@ -90,10 +75,8 @@ export function Sidebar() {
               <li key={item.name}>
                 <Link
                   to={item.href}
-                  className={cn(
-                    "nav-item",
-                    isActive && "nav-item-active"
-                  )}
+                  onClick={onNavigate}
+                  className={cn("nav-item", isActive && "nav-item-active")}
                   title={collapsed ? item.name : undefined}
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
@@ -105,7 +88,6 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      {/* User Section */}
       <div className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground font-semibold text-sm">
@@ -122,7 +104,7 @@ export function Sidebar() {
             </div>
           )}
           {!collapsed && (
-            <button 
+            <button
               onClick={handleSignOut}
               className="p-1.5 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
               title="Sign out"

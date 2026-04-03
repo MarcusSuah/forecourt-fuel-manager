@@ -1,23 +1,37 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { TankCard } from "@/components/dashboard/TankCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Plus, Download } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { Constants } from "@/integrations/supabase/types";
 
 export default function Tanks() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [branchFilter, setBranchFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Form state
+  const [tankName, setTankName] = useState("");
+  const [tankBranch, setTankBranch] = useState("");
+  const [tankProduct, setTankProduct] = useState<string>("");
+  const [tankCapacity, setTankCapacity] = useState("");
+  const [tankThreshold, setTankThreshold] = useState("");
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
@@ -41,6 +55,32 @@ export default function Tanks() {
     },
   });
 
+  const createTankMutation = useMutation({
+    mutationFn: async () => {
+      const capacity = parseFloat(tankCapacity);
+      const threshold = parseFloat(tankThreshold) || 0;
+      if (!tankName.trim() || !tankBranch || !tankProduct || isNaN(capacity) || capacity <= 0) {
+        throw new Error("Please fill all required fields with valid values");
+      }
+      const { error } = await supabase.from("tanks").insert({
+        name: tankName.trim(),
+        branch_id: tankBranch,
+        product_type: tankProduct as "PMS" | "AGO",
+        capacity_usg: capacity,
+        threshold_usg: threshold,
+        current_level_usg: 0,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Tank created successfully");
+      queryClient.invalidateQueries({ queryKey: ["tanks"] });
+      setDialogOpen(false);
+      setTankName(""); setTankBranch(""); setTankProduct(""); setTankCapacity(""); setTankThreshold("");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const filteredTanks = (tanks ?? []).filter((t) => {
     if (branchFilter !== "all" && t.branch_id !== branchFilter) return false;
     if (productFilter !== "all" && t.product_type !== productFilter.toUpperCase()) return false;
@@ -57,41 +97,30 @@ export default function Tanks() {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `${mins} min ago`;
-    const hrs = Math.floor(mins / 60);
-    return `${hrs}h ago`;
+    return `${Math.floor(mins / 60)}h ago`;
   };
 
   return (
     <AppLayout title="Tank Management" subtitle="Monitor and manage fuel tank levels">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-52 bg-card">
-              <SelectValue placeholder="All Branches" />
-            </SelectTrigger>
+            <SelectTrigger className="w-52 bg-card"><SelectValue placeholder="All Branches" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Branches</SelectItem>
-              {branches?.map((b) => (
-                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-              ))}
+              {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
             </SelectContent>
           </Select>
-
           <Select value={productFilter} onValueChange={setProductFilter}>
-            <SelectTrigger className="w-32 bg-card">
-              <SelectValue placeholder="Product" />
-            </SelectTrigger>
+            <SelectTrigger className="w-32 bg-card"><SelectValue placeholder="Product" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Products</SelectItem>
               <SelectItem value="pms">PMS Only</SelectItem>
               <SelectItem value="ago">AGO Only</SelectItem>
             </SelectContent>
           </Select>
-
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-36 bg-card">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
+            <SelectTrigger className="w-36 bg-card"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="full">Full (70%+)</SelectItem>
@@ -102,14 +131,61 @@ export default function Tanks() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Tank
-          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" /> Add Tank
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Tank</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label>Tank Name *</Label>
+                  <Input value={tankName} onChange={(e) => setTankName(e.target.value)} placeholder="e.g. Tank 1" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Branch *</Label>
+                  <Select value={tankBranch} onValueChange={setTankBranch}>
+                    <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                    <SelectContent>
+                      {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Product Type *</Label>
+                  <Select value={tankProduct} onValueChange={setTankProduct}>
+                    <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                    <SelectContent>
+                      {Constants.public.Enums.product_type.map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Capacity (USG) *</Label>
+                    <Input type="number" value={tankCapacity} onChange={(e) => setTankCapacity(e.target.value)} placeholder="e.g. 10000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Threshold (USG)</Label>
+                    <Input type="number" value={tankThreshold} onChange={(e) => setTankThreshold(e.target.value)} placeholder="e.g. 1000" />
+                  </div>
+                </div>
+                <Button
+                  onClick={() => createTankMutation.mutate()}
+                  className="w-full"
+                  disabled={createTankMutation.isPending}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Create Tank
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -142,7 +218,6 @@ export default function Tanks() {
         </div>
       </div>
 
-      {/* Tank Grid */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
