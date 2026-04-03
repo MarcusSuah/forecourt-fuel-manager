@@ -152,6 +152,34 @@ export default function Reports() {
     );
   };
 
+  const exportDailyPDF = () => {
+    exportTableToPDF(
+      "Daily Sales Report",
+      `${dateFrom} to ${dateTo}`,
+      ["Date", "PMS (USG)", "AGO (USG)", "Total (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
+      dailySummary.map(d => [d.displayDate, d.pmsUsg.toFixed(1), d.agoUsg.toFixed(1), d.totalUsg.toFixed(1), `$${d.totalSalesUsd.toFixed(2)}`, `$${d.totalCashUsd.toFixed(2)}`, `${d.variance >= 0 ? "+" : ""}$${d.variance.toFixed(2)}`]),
+      [
+        { label: "Total Volume", value: `${grandTotals.totalUsg.toLocaleString(undefined, { maximumFractionDigits: 0 })} USG` },
+        { label: "Total Sales", value: `$${grandTotals.salesUsd.toFixed(2)}` },
+        { label: "Total Cash", value: `$${grandTotals.cashUsd.toFixed(2)}` },
+        { label: "Variance", value: `${grandTotals.variance >= 0 ? "+" : ""}$${grandTotals.variance.toFixed(2)}` },
+      ]
+    );
+  };
+
+  const exportBranchPDF = () => {
+    exportTableToPDF(
+      "Branch Performance Report",
+      `${dateFrom} to ${dateTo}`,
+      ["Branch", "PMS (USG)", "AGO (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
+      branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), `$${b.salesUsd.toFixed(2)}`, `$${b.cashUsd.toFixed(2)}`, `${b.variance >= 0 ? "+" : ""}$${b.variance.toFixed(2)}`])
+    );
+  };
+      ["Branch", "PMS (USG)", "AGO (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
+      branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), b.salesUsd.toFixed(2), b.cashUsd.toFixed(2), b.variance.toFixed(2)])
+    );
+  };
+
   return (
     <AppLayout title="Reports" subtitle="Consolidated daily and weekly summaries across all branches">
       {/* Filters */}
