@@ -175,10 +175,6 @@ export default function Reports() {
       branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), `$${b.salesUsd.toFixed(2)}`, `$${b.cashUsd.toFixed(2)}`, `${b.variance >= 0 ? "+" : ""}$${b.variance.toFixed(2)}`])
     );
   };
-      ["Branch", "PMS (USG)", "AGO (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
-      branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), b.salesUsd.toFixed(2), b.cashUsd.toFixed(2), b.variance.toFixed(2)])
-    );
-  };
 
   return (
     <AppLayout title="Reports" subtitle="Consolidated daily and weekly summaries across all branches">
