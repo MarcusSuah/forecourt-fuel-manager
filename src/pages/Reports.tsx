@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileBarChart, Download, Fuel, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
+import { FileBarChart, Download, Fuel, DollarSign, TrendingUp, TrendingDown, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, eachDayOfInterval, parseISO } from "date-fns";
 import { downloadCSV } from "@/lib/csv-export";
