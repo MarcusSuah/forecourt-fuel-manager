@@ -403,7 +403,10 @@ export default function Reports() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Branch Performance Summary</CardTitle>
-                <Button variant="outline" size="sm" onClick={exportBranchCSV}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportBranchPDF}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
+                  <Button variant="outline" size="sm" onClick={exportBranchCSV}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-x-auto">
