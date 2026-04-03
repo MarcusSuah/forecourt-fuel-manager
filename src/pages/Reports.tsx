@@ -342,7 +342,10 @@ export default function Reports() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Daily Summary — {format(parseISO(dateFrom), "MMM dd")} to {format(parseISO(dateTo), "MMM dd, yyyy")}</CardTitle>
-                <Button variant="outline" size="sm" onClick={exportDailyCSV}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportDailyPDF}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
+                  <Button variant="outline" size="sm" onClick={exportDailyCSV}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="overflow-x-auto">
