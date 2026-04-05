@@ -44,7 +44,7 @@ export default function AdminUsers() {
   const [editBranch, setEditBranch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Auto-assign admin role if current user has no role
+  // Auto-assign admin role if current user has no role (uses bootstrap_admin which only works when no admins exist)
   useEffect(() => {
     if (user && !user.role) {
       const assignAdmin = async () => {
@@ -54,14 +54,14 @@ export default function AdminUsers() {
           .eq("user_id", user.id)
           .maybeSingle();
         if (!existing) {
-          const { error } = await supabase.from("user_roles").insert({
-            user_id: user.id,
-            role: "admin" as any,
-          });
-          if (!error) {
+          // Use bootstrap_admin RPC which bypasses RLS for the first admin
+          const { data, error } = await supabase.rpc("bootstrap_admin", { _user_id: user.id });
+          if (!error && data) {
             toast.success("You have been assigned the Admin role");
             queryClient.invalidateQueries({ queryKey: ["all-user-roles"] });
             window.location.reload();
+          } else if (!data) {
+            toast.info("An admin already exists. Ask an admin to assign your role.");
           }
         }
       };
