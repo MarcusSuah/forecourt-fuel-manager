@@ -149,6 +149,24 @@ export default function Login() {
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
+                  <Select value={selectedRole} onValueChange={setSelectedRole}>
+                    <SelectTrigger className="pl-10">
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin — Full system access</SelectItem>
+                      <SelectItem value="supervisor">Supervisor — Branch management</SelectItem>
+                      <SelectItem value="cashier">Cashier — Cash & sales reports</SelectItem>
+                      <SelectItem value="attendant">Attendant — Shift sales entry</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             )}
 
             <div className="space-y-2">
