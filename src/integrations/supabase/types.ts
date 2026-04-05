@@ -210,6 +210,69 @@ export type Database = {
           },
         ]
       }
+      fuel_deliveries: {
+        Row: {
+          branch_id: string
+          created_at: string
+          created_by: string | null
+          delivery_date: string
+          driver_name: string | null
+          id: string
+          notes: string | null
+          quantity_usg: number
+          receipt_number: string | null
+          supplier: string | null
+          tank_id: string
+          updated_at: string
+          vehicle_plate: string | null
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          created_by?: string | null
+          delivery_date?: string
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          quantity_usg?: number
+          receipt_number?: string | null
+          supplier?: string | null
+          tank_id: string
+          updated_at?: string
+          vehicle_plate?: string | null
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          created_by?: string | null
+          delivery_date?: string
+          driver_name?: string | null
+          id?: string
+          notes?: string | null
+          quantity_usg?: number
+          receipt_number?: string | null
+          supplier?: string | null
+          tank_id?: string
+          updated_at?: string
+          vehicle_plate?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_deliveries_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_deliveries_tank_id_fkey"
+            columns: ["tank_id"]
+            isOneToOne: false
+            referencedRelation: "tanks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       islands: {
         Row: {
           branch_id: string
@@ -649,6 +712,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bootstrap_admin: { Args: { _user_id: string }; Returns: boolean }
       get_user_branch: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
