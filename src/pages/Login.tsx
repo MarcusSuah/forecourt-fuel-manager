@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Fuel, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
+import { Fuel, Mail, Lock, Eye, EyeOff, User, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -14,6 +17,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>("attendant");
   const navigate = useNavigate();
   const { signIn, signUp } = useAuth();
 
@@ -23,11 +27,11 @@ export default function Login() {
 
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, fullName);
+        const { error } = await signUp(email, password, fullName, selectedRole);
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Account created! You can now sign in.");
+          toast.success("Account created! Please check your email to verify, then sign in.");
           setIsSignUp(false);
         }
       } else {
@@ -130,21 +134,41 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="pl-10"
-                    required={isSignUp}
-                  />
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="John Doe"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="pl-10"
+                      required={isSignUp}
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <div className="relative">
+                    <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
+                    <Select value={selectedRole} onValueChange={setSelectedRole}>
+                      <SelectTrigger className="pl-10">
+                        <SelectValue placeholder="Select your role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin — Full system access</SelectItem>
+                        <SelectItem value="supervisor">Supervisor — Branch management</SelectItem>
+                        <SelectItem value="cashier">Cashier — Cash & sales reports</SelectItem>
+                        <SelectItem value="attendant">Attendant — Shift sales entry</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
             )}
 
             <div className="space-y-2">
@@ -229,20 +253,21 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Role Info */}
-          <div className="pt-6 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-3">Available roles in FMS:</p>
-            <div className="flex flex-wrap gap-2">
-              {["Admin", "Supervisor", "Cashier", "Attendant"].map((role) => (
-                <span
-                  key={role}
-                  className="px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground"
-                >
-                  {role}
-                </span>
-              ))}
+          {!isSignUp && (
+            <div className="pt-6 border-t border-border">
+              <p className="text-sm text-muted-foreground mb-3">Available roles in FMS:</p>
+              <div className="flex flex-wrap gap-2">
+                {["Admin", "Supervisor", "Cashier", "Attendant"].map((role) => (
+                  <span
+                    key={role}
+                    className="px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground"
+                  >
+                    {role}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
