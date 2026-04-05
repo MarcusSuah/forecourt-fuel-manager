@@ -253,20 +253,21 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Role Info */}
-          <div className="pt-6 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-3">Available roles in FMS:</p>
-            <div className="flex flex-wrap gap-2">
-              {["Admin", "Supervisor", "Cashier", "Attendant"].map((role) => (
-                <span
-                  key={role}
-                  className="px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground"
-                >
-                  {role}
-                </span>
-              ))}
+          {!isSignUp && (
+            <div className="pt-6 border-t border-border">
+              <p className="text-sm text-muted-foreground mb-3">Available roles in FMS:</p>
+              <div className="flex flex-wrap gap-2">
+                {["Admin", "Supervisor", "Cashier", "Attendant"].map((role) => (
+                  <span
+                    key={role}
+                    className="px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground"
+                  >
+                    {role}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
