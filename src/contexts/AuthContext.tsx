@@ -105,8 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (email: string, password: string, fullName: string, role?: string) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -116,6 +116,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
+    
+    // Assign role via RPC if signup succeeded and role provided
+    if (!error && data.user && role) {
+      await supabase.rpc("assign_role_on_signup", {
+        _user_id: data.user.id,
+        _role: role as any,
+      });
+    }
+    
     return { error: error as Error | null };
   };
 

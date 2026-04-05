@@ -28,7 +28,7 @@ export default function Login() {
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Account created! You can now sign in.");
+          toast.success("Account created! Please check your email to verify, then sign in.");
           setIsSignUp(false);
         }
       } else {
