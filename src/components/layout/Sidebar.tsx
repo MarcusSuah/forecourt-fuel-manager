@@ -17,6 +17,7 @@ const navigation = [
   { name: "Stock Control", href: "/stock", icon: Fuel },
   { name: "Reports", href: "/reports", icon: FileBarChart },
   { name: "Attendants", href: "/attendants", icon: Users },
+  { name: "Deliveries", href: "/deliveries", icon: Truck },
   { name: "Analytics", href: "/analytics", icon: TrendingUp },
   { name: "Admin", href: "/admin", icon: ShieldCheck },
   { name: "Settings", href: "/settings", icon: Settings },

@@ -115,6 +115,14 @@ const App = () => (
               }
             />
             <Route
+              path="/deliveries"
+              element={
+                <ProtectedRoute>
+                  <Deliveries />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/settings"
               element={
                 <ProtectedRoute>
