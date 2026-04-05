@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Fuel, Users, Building2, Receipt, Wallet,
   FileBarChart, Settings, ChevronLeft, ChevronRight, Droplets,
-  TrendingUp, LogOut, ShieldCheck,
+  TrendingUp, LogOut, ShieldCheck, Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
