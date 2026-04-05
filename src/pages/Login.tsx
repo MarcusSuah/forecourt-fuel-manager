@@ -134,39 +134,41 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="pl-10"
-                    required={isSignUp}
-                  />
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="John Doe"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="pl-10"
+                      required={isSignUp}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
-                  <Select value={selectedRole} onValueChange={setSelectedRole}>
-                    <SelectTrigger className="pl-10">
-                      <SelectValue placeholder="Select your role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin — Full system access</SelectItem>
-                      <SelectItem value="supervisor">Supervisor — Branch management</SelectItem>
-                      <SelectItem value="cashier">Cashier — Cash & sales reports</SelectItem>
-                      <SelectItem value="attendant">Attendant — Shift sales entry</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <div className="relative">
+                    <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
+                    <Select value={selectedRole} onValueChange={setSelectedRole}>
+                      <SelectTrigger className="pl-10">
+                        <SelectValue placeholder="Select your role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin — Full system access</SelectItem>
+                        <SelectItem value="supervisor">Supervisor — Branch management</SelectItem>
+                        <SelectItem value="cashier">Cashier — Cash & sales reports</SelectItem>
+                        <SelectItem value="attendant">Attendant — Shift sales entry</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             <div className="space-y-2">
