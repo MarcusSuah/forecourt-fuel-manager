@@ -27,7 +27,7 @@ export default function Login() {
 
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, fullName);
+        const { error } = await signUp(email, password, fullName, selectedRole);
         if (error) {
           toast.error(error.message);
         } else {
