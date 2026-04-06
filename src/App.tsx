@@ -18,6 +18,11 @@ import Branches from "./pages/Branches";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Deliveries from "./pages/Deliveries";
+import Employees from "./pages/Employees";
+import HRM from "./pages/HRM";
+import Payroll from "./pages/Payroll";
+import ProfitLoss from "./pages/ProfitLoss";
+import FinancialSituation from "./pages/FinancialSituation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
