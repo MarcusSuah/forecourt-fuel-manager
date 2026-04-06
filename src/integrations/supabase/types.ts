@@ -107,6 +107,44 @@ export type Database = {
           },
         ]
       }
+      bonuses: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          date: string
+          employee_id: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          employee_id: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          employee_id?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bonuses_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           county: string
@@ -210,6 +248,156 @@ export type Database = {
           },
         ]
       }
+      employees: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          date_of_birth: string | null
+          employment_date: string
+          full_name: string
+          gender: string | null
+          gross_salary: number
+          id: string
+          is_active: boolean
+          photo_url: string | null
+          position: string
+          social_security_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          employment_date?: string
+          full_name: string
+          gender?: string | null
+          gross_salary?: number
+          id?: string
+          is_active?: boolean
+          photo_url?: string | null
+          position: string
+          social_security_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          employment_date?: string
+          full_name?: string
+          gender?: string | null
+          gross_salary?: number
+          id?: string
+          is_active?: boolean
+          photo_url?: string | null
+          position?: string
+          social_security_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financial_assets: {
+        Row: {
+          branch_id: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          branch_id?: string | null
+          category: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          branch_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_assets_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financial_liabilities: {
+        Row: {
+          branch_id: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          branch_id?: string | null
+          category: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          branch_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_liabilities_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fuel_deliveries: {
         Row: {
           branch_id: string
@@ -298,6 +486,156 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "islands_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_requests: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          employee_id: string
+          end_date: string
+          id: string
+          leave_type: string
+          reason: string | null
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          employee_id: string
+          end_date: string
+          id?: string
+          leave_type: string
+          reason?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          employee_id?: string
+          end_date?: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll: {
+        Row: {
+          bonuses: number
+          created_at: string
+          created_by: string | null
+          deductions: number
+          employee_id: string
+          gross_salary: number
+          id: string
+          month: number
+          net_salary: number
+          notes: string | null
+          status: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          bonuses?: number
+          created_at?: string
+          created_by?: string | null
+          deductions?: number
+          employee_id: string
+          gross_salary?: number
+          id?: string
+          month: number
+          net_salary?: number
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          bonuses?: number
+          created_at?: string
+          created_by?: string | null
+          deductions?: number
+          employee_id?: string
+          gross_salary?: number
+          id?: string
+          month?: number
+          net_salary?: number
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pl_entries: {
+        Row: {
+          amount: number
+          branch_id: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          date: string
+          description: string | null
+          entry_type: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          branch_id?: string | null
+          category: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string | null
+          entry_type: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          branch_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string | null
+          entry_type?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pl_entries_branch_id_fkey"
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"

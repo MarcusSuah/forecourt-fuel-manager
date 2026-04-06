@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Fuel, Users, Building2, Receipt, Wallet,
   FileBarChart, Settings, ChevronLeft, ChevronRight, Droplets,
-  TrendingUp, LogOut, ShieldCheck, Truck,
+  TrendingUp, LogOut, ShieldCheck, Truck, UserCog, CalendarDays,
+  DollarSign, PieChart, Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,9 +16,14 @@ const navigation = [
   { name: "Sales Entry", href: "/sales", icon: Receipt },
   { name: "Cash Reports", href: "/cash", icon: Wallet },
   { name: "Stock Control", href: "/stock", icon: Fuel },
+  { name: "Deliveries", href: "/deliveries", icon: Truck },
+  { name: "Employees", href: "/employees", icon: UserCog },
+  { name: "HRM", href: "/hrm", icon: CalendarDays },
+  { name: "Payroll", href: "/payroll", icon: DollarSign },
+  { name: "Profit & Loss", href: "/profit-loss", icon: PieChart },
+  { name: "Financial", href: "/financial-situation", icon: Landmark },
   { name: "Reports", href: "/reports", icon: FileBarChart },
   { name: "Attendants", href: "/attendants", icon: Users },
-  { name: "Deliveries", href: "/deliveries", icon: Truck },
   { name: "Analytics", href: "/analytics", icon: TrendingUp },
   { name: "Admin", href: "/admin", icon: ShieldCheck },
   { name: "Settings", href: "/settings", icon: Settings },

@@ -18,6 +18,11 @@ import Branches from "./pages/Branches";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Deliveries from "./pages/Deliveries";
+import Employees from "./pages/Employees";
+import HRM from "./pages/HRM";
+import Payroll from "./pages/Payroll";
+import ProfitLoss from "./pages/ProfitLoss";
+import FinancialSituation from "./pages/FinancialSituation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -122,14 +127,12 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
+            <Route path="/hrm" element={<ProtectedRoute><HRM /></ProtectedRoute>} />
+            <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
+            <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
+            <Route path="/financial-situation" element={<ProtectedRoute><FinancialSituation /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

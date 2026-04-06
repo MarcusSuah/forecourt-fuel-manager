@@ -165,7 +165,7 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>LRD per 1 USD</Label>
+              <Label>1 USD = how many LRD?</Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
