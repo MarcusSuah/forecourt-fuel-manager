@@ -108,6 +108,17 @@ export default function Employees() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search employees..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => {
+              if (!filtered?.length) return toast.error("No data to export");
+              downloadCSV("employees.csv", ["Full Name","Position","Gender","Age","Employment Date","Years of Service","Gross Salary","SSN","Branch"],
+                filtered.map(e => [e.full_name, e.position, e.gender || "", String(getAge(e.date_of_birth)), e.employment_date, String(getYearsOfService(e.employment_date)), String(e.gross_salary), e.social_security_number || "", (e as any).branches?.name || ""]));
+            }}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => {
+              if (!filtered?.length) return toast.error("No data to export");
+              exportTableToPDF("Employee Registry", `${filtered.length} employees`, ["Full Name","Position","Gender","Age","Emp. Date","Service","Salary","SSN","Branch"],
+                filtered.map(e => [e.full_name, e.position, e.gender || "—", String(getAge(e.date_of_birth)), e.employment_date, `${getYearsOfService(e.employment_date)} yrs`, `$${Number(e.gross_salary).toLocaleString()}`, e.social_security_number || "—", (e as any).branches?.name || "—"]));
+            }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-1" /> Add Employee</Button>
@@ -181,6 +192,7 @@ export default function Employees() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card>

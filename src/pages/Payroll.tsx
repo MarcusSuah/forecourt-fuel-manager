@@ -15,7 +15,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { FileText, Play, Printer } from "lucide-react";
+import { FileText, Play, Printer, Download } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -156,6 +158,17 @@ export default function Payroll() {
               <Button onClick={() => generatePayroll.mutate()} disabled={generatePayroll.isPending}>
                 <Play className="h-4 w-4 mr-1" /> Generate Payroll
               </Button>
+              <Button variant="outline" onClick={() => {
+                if (!payrollRecords?.length) return toast.error("No payroll data");
+                downloadCSV(`payroll-${MONTHS[parseInt(month)-1]}-${year}.csv`, ["Employee","Position","Gross","Bonuses","Deductions","Net Salary","Status"],
+                  payrollRecords.map(r => [(r as any).employees?.full_name || "", (r as any).employees?.position || "", String(r.gross_salary), String(r.bonuses), String(r.deductions), String(r.net_salary), r.status]));
+              }}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+              <Button variant="outline" onClick={() => {
+                if (!payrollRecords?.length) return toast.error("No payroll data");
+                exportTableToPDF(`Payroll — ${MONTHS[parseInt(month)-1]} ${year}`, `Total Net: $${totalNet.toLocaleString()}`, ["Employee","Position","Gross","Bonuses","Deductions","Net Salary","Status"],
+                  payrollRecords.map(r => [(r as any).employees?.full_name || "", (r as any).employees?.position || "", `$${Number(r.gross_salary).toLocaleString()}`, `+$${Number(r.bonuses).toLocaleString()}`, `-$${Number(r.deductions).toLocaleString()}`, `$${Number(r.net_salary).toLocaleString()}`, r.status]),
+                  [{ label: "Total Net Payroll", value: `$${totalNet.toLocaleString()}` }]);
+              }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
             </div>
           </CardContent>
         </Card>
