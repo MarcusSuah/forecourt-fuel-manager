@@ -18,7 +18,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Users, Search } from "lucide-react";
+import { Plus, Users, Search, Download, FileText } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
 import { format, differenceInYears } from "date-fns";
 
 export default function Employees() {
