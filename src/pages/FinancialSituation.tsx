@@ -19,8 +19,10 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Landmark, CreditCard, Scale } from "lucide-react";
+import { Plus, Landmark, CreditCard, Scale, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
+import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function FinancialSituation() {
@@ -124,6 +126,17 @@ export default function FinancialSituation() {
             <div className="flex flex-wrap gap-3 items-end">
               <div className="space-y-1"><Label>From</Label><Input type="month" value={fromMonth} onChange={e => setFromMonth(e.target.value)} className="w-40" /></div>
               <div className="space-y-1"><Label>To</Label><Input type="month" value={toMonth} onChange={e => setToMonth(e.target.value)} className="w-40" /></div>
+              <Button variant="outline" size="sm" onClick={() => {
+                const allRows = [...(assets || []).map(a => ["Asset", a.name, a.category, String(a.value), a.date]), ...(liabilities || []).map(l => ["Liability", l.name, l.category, String(l.value), l.date])];
+                if (!allRows.length) return toast.error("No data");
+                downloadCSV(`financial-situation-${fromMonth}-to-${toMonth}.csv`, ["Type","Name","Category","Value (USD)","Date"], allRows);
+              }}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                const allRows = [...(assets || []).map(a => ["Asset", a.name, a.category, `$${Number(a.value).toLocaleString()}`, a.date]), ...(liabilities || []).map(l => ["Liability", l.name, l.category, `$${Number(l.value).toLocaleString()}`, l.date])];
+                if (!allRows.length) return toast.error("No data");
+                exportTableToPDF("Financial Situation", `${fromMonth} to ${toMonth}`, ["Type","Name","Category","Value","Date"], allRows,
+                  [{ label: "Total Assets", value: `$${totalAssets.toLocaleString()}` }, { label: "Total Liabilities", value: `$${totalLiabilities.toLocaleString()}` }, { label: "Net Worth", value: `$${netWorth.toLocaleString()}` }]);
+              }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
             </div>
           </CardContent>
         </Card>
