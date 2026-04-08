@@ -276,11 +276,21 @@ export default function Attendants() {
                       <TableCell className="text-muted-foreground">{att.employee_id || "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{att.phone || "—"}</TableCell>
                       <TableCell>{(att.branches as any)?.name || "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={att.is_active ? "default" : "secondary"}>
-                          {att.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
+                        <TableCell>
+                          <button
+                            onClick={async () => {
+                              const { error } = await supabase.from("attendants").update({ is_active: !att.is_active }).eq("id", att.id);
+                              if (error) { toast.error(error.message); return; }
+                              toast.success(`${att.full_name} ${!att.is_active ? "activated" : "deactivated"}`);
+                              queryClient.invalidateQueries({ queryKey: ["attendants-mgmt"] });
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <Badge variant={att.is_active ? "default" : "secondary"}>
+                              {att.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                          </button>
+                        </TableCell>
                       <TableCell>
                         {todayAss.length > 0 ? (
                           <div className="space-y-1">

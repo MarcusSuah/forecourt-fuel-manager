@@ -41,7 +41,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/login");
+    navigate("/");
   };
 
   const getInitials = (name: string) =>
