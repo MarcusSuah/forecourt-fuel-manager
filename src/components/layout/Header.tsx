@@ -1,4 +1,5 @@
-import { Bell, Search, Calendar, MapPin } from "lucide-react";
+import { Bell, Search, Calendar, MapPin, Fuel } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
