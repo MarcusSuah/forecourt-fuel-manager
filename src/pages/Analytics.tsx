@@ -1,23 +1,22 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useBranchFilter } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer,
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import {
-  TrendingUp, TrendingDown, Fuel, DollarSign, Users, Building2, BarChart3, Activity,
+  Fuel, DollarSign, Users, Building2, BarChart3, Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, eachDayOfInterval, parseISO } from "date-fns";
@@ -32,51 +31,16 @@ const revenueConfig = {
 };
 
 const PIE_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(var(--success))",
-  "hsl(var(--warning))",
-  "hsl(var(--destructive))",
+  "hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--success))",
+  "hsl(var(--warning))", "hsl(var(--destructive))",
 ];
 
 export default function Analytics() {
   const [period, setPeriod] = useState("7");
+  const { branchFilter, setBranchFilter, isBranchDisabled, isDealer } = useBranchFilter();
   const dateFrom = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd");
   const dateTo = format(new Date(), "yyyy-MM-dd");
   const prevFrom = format(subDays(new Date(), parseInt(period) * 2), "yyyy-MM-dd");
-
-  const { data: salesData } = useQuery({
-    queryKey: ["analytics-sales", dateFrom, dateTo],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("shift_sales_reports")
-        .select("date, branch_id, sales_usg, total_sales_usd, pumps(product_type), branches(name), attendants(full_name)")
-        .gte("date", dateFrom).lte("date", dateTo);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: prevSalesData } = useQuery({
-    queryKey: ["analytics-prev-sales", prevFrom, dateFrom],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("shift_sales_reports")
-        .select("sales_usg, total_sales_usd")
-        .gte("date", prevFrom).lt("date", dateFrom);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: cashData } = useQuery({
-    queryKey: ["analytics-cash", dateFrom, dateTo],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("cash_deposits")
-        .select("date, amount_usd, branch_id, branches(name)")
-        .gte("date", dateFrom).lte("date", dateTo);
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
@@ -87,16 +51,56 @@ export default function Analytics() {
     },
   });
 
-  const { data: tanks } = useQuery({
-    queryKey: ["analytics-tanks"],
+  const { data: salesData } = useQuery({
+    queryKey: ["analytics-sales", dateFrom, dateTo, branchFilter],
     queryFn: async () => {
-      const { data, error } = await supabase.from("tanks").select("*").eq("is_active", true);
+      let q = supabase.from("shift_sales_reports")
+        .select("date, branch_id, sales_usg, total_sales_usd, pumps(product_type), branches(name), attendants(full_name)")
+        .gte("date", dateFrom).lte("date", dateTo);
+      if (branchFilter !== "all") q = q.eq("branch_id", branchFilter);
+      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
   });
 
-  // KPIs
+  const { data: prevSalesData } = useQuery({
+    queryKey: ["analytics-prev-sales", prevFrom, dateFrom, branchFilter],
+    queryFn: async () => {
+      let q = supabase.from("shift_sales_reports")
+        .select("sales_usg, total_sales_usd")
+        .gte("date", prevFrom).lt("date", dateFrom);
+      if (branchFilter !== "all") q = q.eq("branch_id", branchFilter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: cashData } = useQuery({
+    queryKey: ["analytics-cash", dateFrom, dateTo, branchFilter],
+    queryFn: async () => {
+      let q = supabase.from("cash_deposits")
+        .select("date, amount_usd, branch_id, branches(name)")
+        .gte("date", dateFrom).lte("date", dateTo);
+      if (branchFilter !== "all") q = q.eq("branch_id", branchFilter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: tanks } = useQuery({
+    queryKey: ["analytics-tanks", branchFilter],
+    queryFn: async () => {
+      let q = supabase.from("tanks").select("*").eq("is_active", true);
+      if (branchFilter !== "all") q = q.eq("branch_id", branchFilter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const kpis = useMemo(() => {
     const totalVolume = salesData?.reduce((s, d) => s + (Number(d.sales_usg) || 0), 0) || 0;
     const totalRevenue = salesData?.reduce((s, d) => s + (Number(d.total_sales_usd) || 0), 0) || 0;
@@ -108,11 +112,9 @@ export default function Analytics() {
     const avgDailyRevenue = totalRevenue / (parseInt(period) || 1);
     const collectionRate = totalRevenue > 0 ? (totalCash / totalRevenue) * 100 : 0;
     const lowTanks = tanks?.filter(t => t.status === "Low" || t.status === "Critical").length || 0;
-
     return { totalVolume, totalRevenue, totalCash, volumeTrend, revenueTrend, avgDailyRevenue, collectionRate, lowTanks };
   }, [salesData, prevSalesData, cashData, tanks, period]);
 
-  // Daily trend data
   const dailyTrend = useMemo(() => {
     if (!salesData) return [];
     const days = eachDayOfInterval({ start: parseISO(dateFrom), end: parseISO(dateTo) });
@@ -126,7 +128,6 @@ export default function Analytics() {
     });
   }, [salesData, dateFrom, dateTo]);
 
-  // Branch ranking
   const branchRanking = useMemo(() => {
     if (!salesData) return [];
     const map = new Map<string, { name: string; revenue: number; volume: number }>();
@@ -141,22 +142,19 @@ export default function Analytics() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [salesData]);
 
-  // Top attendants
   const topAttendants = useMemo(() => {
     if (!salesData) return [];
     const map = new Map<string, { name: string; revenue: number; transactions: number }>();
     salesData.forEach(s => {
       const name = (s.attendants as any)?.full_name || "Unknown";
-      const key = name;
-      if (!map.has(key)) map.set(key, { name, revenue: 0, transactions: 0 });
-      const a = map.get(key)!;
+      if (!map.has(name)) map.set(name, { name, revenue: 0, transactions: 0 });
+      const a = map.get(name)!;
       a.revenue += Number(s.total_sales_usd) || 0;
       a.transactions += 1;
     });
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
   }, [salesData]);
 
-  // Tank status distribution
   const tankStatusData = useMemo(() => {
     if (!tanks) return [];
     const counts: Record<string, number> = {};
@@ -166,59 +164,41 @@ export default function Analytics() {
 
   return (
     <AppLayout title="Analytics" subtitle="Performance metrics, trends, and KPI dashboards">
-      {/* Period Selector */}
-      <div className="flex items-center gap-4 mb-6">
-        <Label>Period</Label>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 Days</SelectItem>
-            <SelectItem value="14">Last 14 Days</SelectItem>
-            <SelectItem value="30">Last 30 Days</SelectItem>
-            <SelectItem value="60">Last 60 Days</SelectItem>
-            <SelectItem value="90">Last 90 Days</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Label>Period</Label>
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 Days</SelectItem>
+              <SelectItem value="14">Last 14 Days</SelectItem>
+              <SelectItem value="30">Last 30 Days</SelectItem>
+              <SelectItem value="60">Last 60 Days</SelectItem>
+              <SelectItem value="90">Last 90 Days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {!isDealer && (
+          <Select value={branchFilter} onValueChange={setBranchFilter} disabled={isBranchDisabled}>
+            <SelectTrigger className="w-52"><SelectValue placeholder="All Branches" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Branches</SelectItem>
+              {branches?.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          title="Total Volume"
-          value={`${kpis.totalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })} USG`}
-          icon={<Fuel className="h-6 w-6" />}
-          trend={{ value: Math.round(kpis.volumeTrend * 10) / 10, label: "vs prev period" }}
-          variant="primary"
-        />
-        <MetricCard
-          title="Total Revenue"
-          value={`$${kpis.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-          icon={<DollarSign className="h-6 w-6" />}
-          trend={{ value: Math.round(kpis.revenueTrend * 10) / 10, label: "vs prev period" }}
-          variant="success"
-        />
-        <MetricCard
-          title="Avg Daily Revenue"
-          value={`$${kpis.avgDailyRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-          icon={<BarChart3 className="h-6 w-6" />}
-          subtitle="Per day average"
-        />
-        <MetricCard
-          title="Collection Rate"
-          value={`${kpis.collectionRate.toFixed(1)}%`}
-          icon={<Activity className="h-6 w-6" />}
-          variant={kpis.collectionRate >= 95 ? "success" : kpis.collectionRate >= 85 ? "warning" : "danger"}
-          subtitle={`${kpis.lowTanks} tank(s) low`}
-        />
+        <MetricCard title="Total Volume" value={`${kpis.totalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })} USG`} icon={<Fuel className="h-6 w-6" />} trend={{ value: Math.round(kpis.volumeTrend * 10) / 10, label: "vs prev period" }} variant="primary" />
+        <MetricCard title="Total Revenue" value={`$${kpis.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={<DollarSign className="h-6 w-6" />} trend={{ value: Math.round(kpis.revenueTrend * 10) / 10, label: "vs prev period" }} variant="success" />
+        <MetricCard title="Avg Daily Revenue" value={`$${kpis.avgDailyRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={<BarChart3 className="h-6 w-6" />} subtitle="Per day average" />
+        <MetricCard title="Collection Rate" value={`${kpis.collectionRate.toFixed(1)}%`} icon={<Activity className="h-6 w-6" />} variant={kpis.collectionRate >= 95 ? "success" : kpis.collectionRate >= 85 ? "warning" : "danger"} subtitle={`${kpis.lowTanks} tank(s) low`} />
       </div>
 
-      {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Volume Area */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Volume Trend (USG)</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Volume Trend (USG)</CardTitle></CardHeader>
           <CardContent>
             <ChartContainer config={volumeConfig} className="h-[280px] w-full">
               <AreaChart data={dailyTrend}>
@@ -232,12 +212,8 @@ export default function Analytics() {
             </ChartContainer>
           </CardContent>
         </Card>
-
-        {/* Revenue Line */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Revenue Trend ($)</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Revenue Trend ($)</CardTitle></CardHeader>
           <CardContent>
             <ChartContainer config={revenueConfig} className="h-[280px] w-full">
               <LineChart data={dailyTrend}>
@@ -252,13 +228,11 @@ export default function Analytics() {
         </Card>
       </div>
 
-      {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Branch Ranking */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" /> Branch Revenue Ranking
+              <Building2 className="h-4 w-4 text-primary" /> {isDealer ? "Station Revenue" : "Branch Revenue Ranking"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -287,31 +261,22 @@ export default function Analytics() {
             )}
           </CardContent>
         </Card>
-
-        {/* Tank Status Pie */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Tank Status</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Tank Status</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-center">
             {tankStatusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie data={tankStatusData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                    {tankStatusData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
+                    {tankStatusData.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-            ) : (
-              <p className="text-muted-foreground text-sm py-8">No tanks</p>
-            )}
+            ) : (<p className="text-muted-foreground text-sm py-8">No tanks</p>)}
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Attendants */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -322,13 +287,10 @@ export default function Analytics() {
           {topAttendants.length === 0 ? (
             <p className="text-muted-foreground text-sm py-8 text-center">No data</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               {topAttendants.map((a, i) => (
                 <div key={a.name} className="flex flex-col items-center p-4 rounded-lg bg-muted/50 border">
-                  <div className={cn(
-                    "h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm mb-2",
-                    i === 0 ? "bg-primary/20 text-primary" : "bg-muted-foreground/10 text-muted-foreground"
-                  )}>
+                  <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm mb-2", i === 0 ? "bg-primary/20 text-primary" : "bg-muted-foreground/10 text-muted-foreground")}>
                     #{i + 1}
                   </div>
                   <p className="text-sm font-medium text-center truncate w-full">{a.name}</p>

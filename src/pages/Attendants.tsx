@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useBranchFilter, useBranchSelect } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,25 +18,23 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Users, UserPlus, Edit2, Trash2, Phone, Hash, MapPin } from "lucide-react";
+import { Users, UserPlus, Edit2, Trash2, MapPin } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 export default function Attendants() {
   const queryClient = useQueryClient();
-  const [filterBranch, setFilterBranch] = useState("all");
+  const { branchFilter, setBranchFilter, isBranchDisabled } = useBranchFilter();
+  const { selectedBranch: formBranch, setSelectedBranch: setFormBranch, isBranchDisabled: formBranchDisabled } = useBranchSelect();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [editingAttendant, setEditingAttendant] = useState<any>(null);
   const [assigningAttendant, setAssigningAttendant] = useState<any>(null);
 
-  // Form state
   const [formName, setFormName] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formEmployeeId, setFormEmployeeId] = useState("");
-  const [formBranch, setFormBranch] = useState("");
   const [formActive, setFormActive] = useState(true);
 
-  // Assignment form state
   const [assignShift, setAssignShift] = useState("");
   const [assignPump, setAssignPump] = useState("");
 
@@ -94,20 +93,14 @@ export default function Attendants() {
     mutationFn: async (att: any) => {
       if (att.id) {
         const { error } = await supabase.from("attendants").update({
-          full_name: att.full_name,
-          phone: att.phone,
-          employee_id: att.employee_id,
-          branch_id: att.branch_id,
-          is_active: att.is_active,
+          full_name: att.full_name, phone: att.phone, employee_id: att.employee_id,
+          branch_id: att.branch_id, is_active: att.is_active,
         }).eq("id", att.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("attendants").insert({
-          full_name: att.full_name,
-          phone: att.phone,
-          employee_id: att.employee_id,
-          branch_id: att.branch_id,
-          is_active: att.is_active,
+          full_name: att.full_name, phone: att.phone, employee_id: att.employee_id,
+          branch_id: att.branch_id, is_active: att.is_active,
         });
         if (error) throw error;
       }
@@ -136,9 +129,7 @@ export default function Attendants() {
   const assignMutation = useMutation({
     mutationFn: async (a: { attendant_id: string; shift_id: string; pump_id: string | null }) => {
       const { error } = await supabase.from("attendant_assignments").insert({
-        attendant_id: a.attendant_id,
-        shift_id: a.shift_id,
-        pump_id: a.pump_id || null,
+        attendant_id: a.attendant_id, shift_id: a.shift_id, pump_id: a.pump_id || null,
       });
       if (error) throw error;
     },
@@ -146,83 +137,56 @@ export default function Attendants() {
       toast.success("Assignment saved");
       queryClient.invalidateQueries({ queryKey: ["attendant-assignments"] });
       setAssignDialogOpen(false);
-      setAssignShift("");
-      setAssignPump("");
+      setAssignShift(""); setAssignPump("");
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
   const resetForm = () => {
-    setFormName("");
-    setFormPhone("");
-    setFormEmployeeId("");
-    setFormBranch("");
-    setFormActive(true);
-    setEditingAttendant(null);
+    setFormName(""); setFormPhone(""); setFormEmployeeId("");
+    setFormActive(true); setEditingAttendant(null);
+    if (!formBranchDisabled) setFormBranch("");
   };
 
-  const openAdd = () => {
-    resetForm();
-    setDialogOpen(true);
-  };
+  const openAdd = () => { resetForm(); setDialogOpen(true); };
 
   const openEdit = (att: any) => {
     setEditingAttendant(att);
-    setFormName(att.full_name);
-    setFormPhone(att.phone || "");
+    setFormName(att.full_name); setFormPhone(att.phone || "");
     setFormEmployeeId(att.employee_id || "");
-    setFormBranch(att.branch_id);
-    setFormActive(att.is_active);
-    setDialogOpen(true);
+    if (!formBranchDisabled) setFormBranch(att.branch_id);
+    setFormActive(att.is_active); setDialogOpen(true);
   };
 
   const openAssign = (att: any) => {
-    setAssigningAttendant(att);
-    setAssignShift("");
-    setAssignPump("");
+    setAssigningAttendant(att); setAssignShift(""); setAssignPump("");
     setAssignDialogOpen(true);
   };
 
   const handleSave = () => {
-    if (!formName || !formBranch) {
-      toast.error("Name and branch are required");
-      return;
-    }
+    if (!formName || !formBranch) { toast.error("Name and branch are required"); return; }
     saveMutation.mutate({
-      id: editingAttendant?.id,
-      full_name: formName,
-      phone: formPhone || null,
-      employee_id: formEmployeeId || null,
-      branch_id: formBranch,
-      is_active: formActive,
+      id: editingAttendant?.id, full_name: formName,
+      phone: formPhone || null, employee_id: formEmployeeId || null,
+      branch_id: formBranch, is_active: formActive,
     });
   };
 
   const handleAssign = () => {
-    if (!assignShift || !assigningAttendant) {
-      toast.error("Shift is required");
-      return;
-    }
-    assignMutation.mutate({
-      attendant_id: assigningAttendant.id,
-      shift_id: assignShift,
-      pump_id: assignPump || null,
-    });
+    if (!assignShift || !assigningAttendant) { toast.error("Shift is required"); return; }
+    assignMutation.mutate({ attendant_id: assigningAttendant.id, shift_id: assignShift, pump_id: assignPump || null });
   };
 
-  const filtered = filterBranch === "all"
+  const filtered = branchFilter === "all"
     ? attendants
-    : attendants?.filter(a => a.branch_id === filterBranch);
+    : attendants?.filter(a => a.branch_id === branchFilter);
 
   const activeCount = attendants?.filter(a => a.is_active).length || 0;
   const todayAssignments = assignments?.length || 0;
-
-  const assignedPumpsForAttendant = (attBranch: string) =>
-    pumps?.filter(p => p.branch_id === attBranch) || [];
+  const assignedPumpsForAttendant = (attBranch: string) => pumps?.filter(p => p.branch_id === attBranch) || [];
 
   return (
     <AppLayout title="Attendants" subtitle="Manage pump attendants and shift assignments">
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card><CardContent className="pt-4 text-center"><p className="text-sm text-muted-foreground">Total</p><p className="text-2xl font-bold">{attendants?.length || 0}</p></CardContent></Card>
         <Card><CardContent className="pt-4 text-center"><p className="text-sm text-muted-foreground">Active</p><p className="text-2xl font-bold text-success">{activeCount}</p></CardContent></Card>
@@ -230,15 +194,14 @@ export default function Attendants() {
         <Card><CardContent className="pt-4 text-center"><p className="text-sm text-muted-foreground">Today's Assignments</p><p className="text-2xl font-bold text-primary">{todayAssignments}</p></CardContent></Card>
       </div>
 
-      {/* List */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-5 w-5 text-primary" /> Attendant List
             </CardTitle>
             <div className="flex items-center gap-3">
-              <Select value={filterBranch} onValueChange={setFilterBranch}>
+              <Select value={branchFilter} onValueChange={setBranchFilter} disabled={isBranchDisabled}>
                 <SelectTrigger className="w-44"><SelectValue placeholder="Filter by branch" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Branches</SelectItem>
@@ -255,10 +218,10 @@ export default function Attendants() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Employee ID</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Branch</TableHead>
+                <TableHead className="hidden md:table-cell">Phone</TableHead>
+                <TableHead className="hidden md:table-cell">Branch</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Today's Shift</TableHead>
+                <TableHead className="hidden lg:table-cell">Today's Shift</TableHead>
                 <TableHead className="w-32">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -274,24 +237,21 @@ export default function Attendants() {
                     <TableRow key={att.id}>
                       <TableCell className="font-medium">{att.full_name}</TableCell>
                       <TableCell className="text-muted-foreground">{att.employee_id || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{att.phone || "—"}</TableCell>
-                      <TableCell>{(att.branches as any)?.name || "—"}</TableCell>
-                        <TableCell>
-                          <button
-                            onClick={async () => {
-                              const { error } = await supabase.from("attendants").update({ is_active: !att.is_active }).eq("id", att.id);
-                              if (error) { toast.error(error.message); return; }
-                              toast.success(`${att.full_name} ${!att.is_active ? "activated" : "deactivated"}`);
-                              queryClient.invalidateQueries({ queryKey: ["attendants-mgmt"] });
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <Badge variant={att.is_active ? "default" : "secondary"}>
-                              {att.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                          </button>
-                        </TableCell>
+                      <TableCell className="text-muted-foreground hidden md:table-cell">{att.phone || "—"}</TableCell>
+                      <TableCell className="hidden md:table-cell">{(att.branches as any)?.name || "—"}</TableCell>
                       <TableCell>
+                        <button onClick={async () => {
+                          const { error } = await supabase.from("attendants").update({ is_active: !att.is_active }).eq("id", att.id);
+                          if (error) { toast.error(error.message); return; }
+                          toast.success(`${att.full_name} ${!att.is_active ? "activated" : "deactivated"}`);
+                          queryClient.invalidateQueries({ queryKey: ["attendants-mgmt"] });
+                        }} className="cursor-pointer">
+                          <Badge variant={att.is_active ? "default" : "secondary"}>
+                            {att.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </button>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {todayAss.length > 0 ? (
                           <div className="space-y-1">
                             {todayAss.map(a => (
@@ -349,7 +309,7 @@ export default function Attendants() {
             </div>
             <div className="space-y-2">
               <Label>Branch *</Label>
-              <Select value={formBranch} onValueChange={setFormBranch}>
+              <Select value={formBranch} onValueChange={setFormBranch} disabled={formBranchDisabled}>
                 <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
                 <SelectContent>
                   {branches?.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
