@@ -1,5 +1,6 @@
-import { Bell, Search, Calendar, MapPin, Fuel } from "lucide-react";
+import { Bell, Calendar, MapPin, Fuel } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDealerBranch } from "@/hooks/useDealerBranch";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -19,6 +20,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const { user } = useAuth();
+  const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -28,6 +30,7 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   const { data: branches } = useQuery({
     queryKey: ["header-branches"],
+    enabled: !isDealer,
     queryFn: async () => {
       const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
       if (error) throw error;
@@ -47,10 +50,12 @@ export function Header({ title, subtitle }: HeaderProps) {
   const { data: tankAlerts } = useQuery({
     queryKey: ["header-tank-alerts"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("tanks")
         .select("id, name, product_type, current_level_usg, capacity_usg, branches(name)")
         .eq("is_active", true);
+      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? [])
         .map(t => ({ ...t, pct: (Number(t.current_level_usg) / Number(t.capacity_usg)) * 100 }))
@@ -66,7 +71,6 @@ export function Header({ title, subtitle }: HeaderProps) {
     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6">
         <div className="flex items-center gap-3 min-w-0">
-          {/* Logo & Name - visible on mobile */}
           <div className="flex items-center gap-2 lg:hidden">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shrink-0">
               <Fuel className="h-4 w-4 text-primary-foreground" />
@@ -80,23 +84,33 @@ export function Header({ title, subtitle }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
+          {/* Dealer branch label */}
+          {isDealer && dealerBranchName && (
+            <Badge variant="outline" className="hidden sm:flex bg-primary/10 text-primary border-primary/30">
+              <MapPin className="h-3 w-3 mr-1" /> {dealerBranchName}
+            </Badge>
+          )}
+
           <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
             <span>{today}</span>
           </div>
 
-          <Select defaultValue="all">
-            <SelectTrigger className="w-32 sm:w-44 bg-card hidden sm:flex">
-              <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Select branch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Branches</SelectItem>
-              {branches?.map((b) => (
-                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Branch selector - hidden for dealers */}
+          {!isDealer && (
+            <Select defaultValue="all">
+              <SelectTrigger className="w-32 sm:w-44 bg-card hidden sm:flex">
+                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Select branch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {branches?.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <Select defaultValue={shifts?.[0]?.id || "morning"}>
             <SelectTrigger className="w-28 sm:w-40 bg-card hidden sm:flex">
@@ -118,7 +132,6 @@ export function Header({ title, subtitle }: HeaderProps) {
             </SelectContent>
           </Select>
 
-          {/* Notifications */}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="icon" className="bg-card relative">
@@ -137,26 +150,16 @@ export function Header({ title, subtitle }: HeaderProps) {
               </div>
               <div className="max-h-64 overflow-y-auto">
                 {alertCount === 0 ? (
-                  <div className="p-6 text-center text-sm text-muted-foreground">
-                    All systems normal ✓
-                  </div>
+                  <div className="p-6 text-center text-sm text-muted-foreground">All systems normal ✓</div>
                 ) : (
                   tankAlerts?.map(t => (
                     <div key={t.id} className="flex items-start gap-3 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className={cn(
-                        "h-2 w-2 rounded-full mt-1.5 shrink-0",
-                        t.pct < 20 ? "bg-destructive animate-pulse" : "bg-warning"
-                      )} />
+                      <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", t.pct < 20 ? "bg-destructive animate-pulse" : "bg-warning")} />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(t.branches as any)?.name} · {t.product_type} · {t.pct.toFixed(0)}%
-                        </p>
+                        <p className="text-xs text-muted-foreground">{(t.branches as any)?.name} · {t.product_type} · {t.pct.toFixed(0)}%</p>
                       </div>
-                      <Badge variant="outline" className={cn(
-                        "text-[10px] shrink-0",
-                        t.pct < 20 ? "border-destructive text-destructive" : "border-warning text-warning"
-                      )}>
+                      <Badge variant="outline" className={cn("text-[10px] shrink-0", t.pct < 20 ? "border-destructive text-destructive" : "border-warning text-warning")}>
                         {t.pct < 20 ? "CRIT" : "LOW"}
                       </Badge>
                     </div>

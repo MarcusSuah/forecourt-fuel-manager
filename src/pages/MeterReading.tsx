@@ -1,0 +1,191 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useDealerBranch } from "@/hooks/useDealerBranch";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Gauge } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+
+export default function MeterReading() {
+  const { isDealer, dealerBranchId } = useDealerBranch();
+  const [selectedBranch, setSelectedBranch] = useState(dealerBranchId || "");
+  const [selectedShift, setSelectedShift] = useState("");
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [meters, setMeters] = useState<Record<string, number>>({});
+
+  const branchId = isDealer ? dealerBranchId : selectedBranch;
+
+  const { data: branches } = useQuery({
+    queryKey: ["branches"],
+    enabled: !isDealer,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: shifts } = useQuery({
+    queryKey: ["shifts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("shifts").select("*").order("start_time");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: pumps } = useQuery({
+    queryKey: ["pumps-meter", branchId],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("pumps").select("*").eq("branch_id", branchId!).eq("is_active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Batch carry-over: get previous shift closing meters for all pumps
+  const { data: prevMeters } = useQuery({
+    queryKey: ["prev-meters-batch", branchId, selectedDate, selectedShift],
+    enabled: !!branchId && !!selectedShift && !!shifts,
+    queryFn: async () => {
+      const shiftOrder = shifts?.map((s) => s.id) ?? [];
+      const currentIdx = shiftOrder.indexOf(selectedShift);
+      let prevShiftId: string | null = null;
+      let prevDate = selectedDate;
+      if (currentIdx > 0) {
+        prevShiftId = shiftOrder[currentIdx - 1];
+      } else if (currentIdx === 0 && shiftOrder.length > 0) {
+        prevShiftId = shiftOrder[shiftOrder.length - 1];
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() - 1);
+        prevDate = format(d, "yyyy-MM-dd");
+      }
+      if (!prevShiftId) return [];
+      const { data, error } = await supabase
+        .from("shift_sales_reports")
+        .select("pump_id, closing_meter")
+        .eq("branch_id", branchId!)
+        .eq("shift_id", prevShiftId)
+        .eq("date", prevDate);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: existingReadings } = useQuery({
+    queryKey: ["existing-meter-readings", branchId, selectedDate, selectedShift],
+    enabled: !!branchId && !!selectedShift,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shift_sales_reports")
+        .select("pump_id, opening_meter, closing_meter")
+        .eq("branch_id", branchId!)
+        .eq("shift_id", selectedShift)
+        .eq("date", selectedDate);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const getOpeningMeter = (pumpId: string) => {
+    const prev = prevMeters?.find((m) => m.pump_id === pumpId);
+    return prev ? Number(prev.closing_meter) : 0;
+  };
+
+  return (
+    <AppLayout title="Meter Readings" subtitle="Record opening and closing meter readings per shift">
+      <Card className="mb-6">
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+            </div>
+            {!isDealer && (
+              <div className="space-y-2">
+                <Label>Branch</Label>
+                <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                  <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+                  <SelectContent>{branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Shift</Label>
+              <Select value={selectedShift} onValueChange={setSelectedShift}>
+                <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
+                <SelectContent>{shifts?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.start_time}–{s.end_time})</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {branchId && selectedShift && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Gauge className="h-5 w-5 text-primary" /> Pump Meter Readings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pump</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Opening Meter</TableHead>
+                  <TableHead className="text-right">Closing Meter</TableHead>
+                  <TableHead className="text-right">Volume (USG)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(pumps ?? []).map((pump) => {
+                  const existing = existingReadings?.find((r) => r.pump_id === pump.id);
+                  const opening = existing?.opening_meter ?? getOpeningMeter(pump.id);
+                  const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
+                  const volume = closing !== "" ? Number(closing) - Number(opening) : null;
+                  return (
+                    <TableRow key={pump.id}>
+                      <TableCell className="font-medium">{pump.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn("text-xs", pump.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
+                          {pump.product_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{Number(opening).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          className="w-32 ml-auto"
+                          value={meters[pump.id] ?? ""}
+                          onChange={(e) => setMeters((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))}
+                          placeholder="Enter closing"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {volume !== null && (
+                          <span className={cn("font-bold", volume >= 0 ? "text-foreground" : "text-destructive")}>
+                            {volume.toLocaleString()}
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </AppLayout>
+  );
+}
