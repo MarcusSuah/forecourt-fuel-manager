@@ -118,7 +118,6 @@ export default function TankDipping() {
           date: selectedDate,
           physical_level_usg: dips[t.id],
           theoretical_level_usg: getOpeningDip(t.id),
-          variance_usg: dips[t.id] - getOpeningDip(t.id),
           created_by: user?.id,
         }));
       if (entries.length === 0) throw new Error("Enter at least one dip reading");
