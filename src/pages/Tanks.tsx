@@ -311,16 +311,29 @@ export default function Tanks() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredTanks.map((tank) => (
-            <TankCard
-              key={tank.id}
-              name={tank.name}
-              product={tank.product_type}
-              capacity={Number(tank.capacity_usg)}
-              currentLevel={Number(tank.current_level_usg)}
-              branch={(tank.branches as any)?.name ?? "Unknown"}
-              lastUpdated={getTimeSince(tank.updated_at)}
-              onEdit={() => handleEdit(tank)}
-            />
+            <div key={tank.id} className="relative group">
+              <TankCard
+                name={tank.name}
+                product={tank.product_type}
+                capacity={Number(tank.capacity_usg)}
+                currentLevel={Number(tank.current_level_usg)}
+                branch={(tank.branches as any)?.name ?? "Unknown"}
+                lastUpdated={getTimeSince(tank.updated_at)}
+                onEdit={() => handleEdit(tank)}
+              />
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => {
+                  if (confirm(`Deactivate tank "${tank.name}"?`)) {
+                    deactivateTankMutation.mutate(tank.id);
+                  }
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           ))}
         </div>
       )}
