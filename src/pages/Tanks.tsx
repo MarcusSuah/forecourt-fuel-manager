@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDealerBranch } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { TankCard } from "@/components/dashboard/TankCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Download } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -20,18 +21,27 @@ import { Constants } from "@/integrations/supabase/types";
 
 export default function Tanks() {
   const { user } = useAuth();
+  const { isDealer, dealerBranchId } = useDealerBranch();
   const queryClient = useQueryClient();
   const [branchFilter, setBranchFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingTank, setEditingTank] = useState<any>(null);
 
-  // Form state
+  // Form state for create
   const [tankName, setTankName] = useState("");
   const [tankBranch, setTankBranch] = useState("");
   const [tankProduct, setTankProduct] = useState<string>("");
   const [tankCapacity, setTankCapacity] = useState("");
   const [tankThreshold, setTankThreshold] = useState("");
+
+  // Form state for edit
+  const [editName, setEditName] = useState("");
+  const [editCapacity, setEditCapacity] = useState("");
+  const [editCurrentLevel, setEditCurrentLevel] = useState("");
+  const [editThreshold, setEditThreshold] = useState("");
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
@@ -45,11 +55,11 @@ export default function Tanks() {
   const { data: tanks, isLoading } = useQuery({
     queryKey: ["tanks"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("tanks")
-        .select("*, branches(name)")
-        .eq("is_active", true)
-        .order("name");
+      let query = supabase.from("tanks").select("*, branches(name)").eq("is_active", true).order("name");
+      if (isDealer && dealerBranchId) {
+        query = query.eq("branch_id", dealerBranchId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -59,12 +69,13 @@ export default function Tanks() {
     mutationFn: async () => {
       const capacity = parseFloat(tankCapacity);
       const threshold = parseFloat(tankThreshold) || 0;
-      if (!tankName.trim() || !tankBranch || !tankProduct || isNaN(capacity) || capacity <= 0) {
+      const branch = isDealer ? dealerBranchId : tankBranch;
+      if (!tankName.trim() || !branch || !tankProduct || isNaN(capacity) || capacity <= 0) {
         throw new Error("Please fill all required fields with valid values");
       }
       const { error } = await supabase.from("tanks").insert({
         name: tankName.trim(),
-        branch_id: tankBranch,
+        branch_id: branch,
         product_type: tankProduct as "PMS" | "AGO",
         capacity_usg: capacity,
         threshold_usg: threshold,
@@ -80,6 +91,41 @@ export default function Tanks() {
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
+  const updateTankMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingTank) throw new Error("No tank selected");
+      const capacity = parseFloat(editCapacity);
+      const currentLevel = parseFloat(editCurrentLevel);
+      const threshold = parseFloat(editThreshold) || 0;
+      if (!editName.trim() || isNaN(capacity) || capacity <= 0 || isNaN(currentLevel) || currentLevel < 0) {
+        throw new Error("Please fill all required fields with valid values");
+      }
+      const { error } = await supabase.from("tanks").update({
+        name: editName.trim(),
+        capacity_usg: capacity,
+        current_level_usg: Math.min(currentLevel, capacity),
+        threshold_usg: threshold,
+      }).eq("id", editingTank.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Tank updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["tanks"] });
+      setEditDialogOpen(false);
+      setEditingTank(null);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const handleEdit = (tank: any) => {
+    setEditingTank(tank);
+    setEditName(tank.name);
+    setEditCapacity(String(tank.capacity_usg));
+    setEditCurrentLevel(String(tank.current_level_usg));
+    setEditThreshold(String(tank.threshold_usg));
+    setEditDialogOpen(true);
+  };
 
   const filteredTanks = (tanks ?? []).filter((t) => {
     if (branchFilter !== "all" && t.branch_id !== branchFilter) return false;
@@ -104,13 +150,15 @@ export default function Tanks() {
     <AppLayout title="Tank Management" subtitle="Monitor and manage fuel tank levels">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-52 bg-card"><SelectValue placeholder="All Branches" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Branches</SelectItem>
-              {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {!isDealer && (
+            <Select value={branchFilter} onValueChange={setBranchFilter}>
+              <SelectTrigger className="w-52 bg-card"><SelectValue placeholder="All Branches" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={productFilter} onValueChange={setProductFilter}>
             <SelectTrigger className="w-32 bg-card"><SelectValue placeholder="Product" /></SelectTrigger>
             <SelectContent>
@@ -130,22 +178,20 @@ export default function Tanks() {
           </Select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" /> Add Tank
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Tank</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Tank Name *</Label>
-                  <Input value={tankName} onChange={(e) => setTankName(e.target.value)} placeholder="e.g. Tank 1" />
-                </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" /> Add Tank
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add New Tank</DialogTitle></DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Tank Name *</Label>
+                <Input value={tankName} onChange={(e) => setTankName(e.target.value)} placeholder="e.g. Tank 1" />
+              </div>
+              {!isDealer && (
                 <div className="space-y-2">
                   <Label>Branch *</Label>
                   <Select value={tankBranch} onValueChange={setTankBranch}>
@@ -155,39 +201,65 @@ export default function Tanks() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Product Type *</Label>
-                  <Select value={tankProduct} onValueChange={setTankProduct}>
-                    <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-                    <SelectContent>
-                      {Constants.public.Enums.product_type.map(p => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Capacity (USG) *</Label>
-                    <Input type="number" value={tankCapacity} onChange={(e) => setTankCapacity(e.target.value)} placeholder="e.g. 10000" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Threshold (USG)</Label>
-                    <Input type="number" value={tankThreshold} onChange={(e) => setTankThreshold(e.target.value)} placeholder="e.g. 1000" />
-                  </div>
-                </div>
-                <Button
-                  onClick={() => createTankMutation.mutate()}
-                  className="w-full"
-                  disabled={createTankMutation.isPending}
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Create Tank
-                </Button>
+              )}
+              <div className="space-y-2">
+                <Label>Product Type *</Label>
+                <Select value={tankProduct} onValueChange={setTankProduct}>
+                  <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                  <SelectContent>
+                    {Constants.public.Enums.product_type.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Capacity (USG) *</Label>
+                  <Input type="number" value={tankCapacity} onChange={(e) => setTankCapacity(e.target.value)} placeholder="e.g. 10000" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Threshold (USG)</Label>
+                  <Input type="number" value={tankThreshold} onChange={(e) => setTankThreshold(e.target.value)} placeholder="e.g. 1000" />
+                </div>
+              </div>
+              <Button onClick={() => createTankMutation.mutate()} className="w-full" disabled={createTankMutation.isPending}>
+                <Plus className="h-4 w-4 mr-2" /> Create Tank
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Tank</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Tank Name *</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Capacity (USG) *</Label>
+                <Input type="number" value={editCapacity} onChange={(e) => setEditCapacity(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Current Level (USG) *</Label>
+                <Input type="number" value={editCurrentLevel} onChange={(e) => setEditCurrentLevel(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Threshold (USG)</Label>
+              <Input type="number" value={editThreshold} onChange={(e) => setEditThreshold(e.target.value)} />
+            </div>
+            <Button onClick={() => updateTankMutation.mutate()} className="w-full" disabled={updateTankMutation.isPending}>
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -235,6 +307,7 @@ export default function Tanks() {
               currentLevel={Number(tank.current_level_usg)}
               branch={(tank.branches as any)?.name ?? "Unknown"}
               lastUpdated={getTimeSince(tank.updated_at)}
+              onEdit={() => handleEdit(tank)}
             />
           ))}
         </div>
