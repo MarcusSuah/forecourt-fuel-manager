@@ -118,6 +118,18 @@ export default function Tanks() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const deactivateTankMutation = useMutation({
+    mutationFn: async (tankId: string) => {
+      const { error } = await supabase.from("tanks").update({ is_active: false }).eq("id", tankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Tank deactivated");
+      queryClient.invalidateQueries({ queryKey: ["tanks"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const handleEdit = (tank: any) => {
     setEditingTank(tank);
     setEditName(tank.name);
