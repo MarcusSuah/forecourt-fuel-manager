@@ -1,26 +1,20 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
-import { useMeterCarryOver } from "@/hooks/useMeterCarryOver";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { Gauge, Save } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 export default function MeterReading() {
-  const { user } = useAuth();
   const { isDealer, dealerBranchId } = useDealerBranch();
-  const queryClient = useQueryClient();
   const [selectedBranch, setSelectedBranch] = useState(dealerBranchId || "");
   const [selectedShift, setSelectedShift] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -57,7 +51,34 @@ export default function MeterReading() {
     },
   });
 
-  const { getCarryOverMeter } = useMeterCarryOver(branchId || "", selectedDate, selectedShift);
+  // Batch carry-over: get previous shift closing meters for all pumps
+  const { data: prevMeters } = useQuery({
+    queryKey: ["prev-meters-batch", branchId, selectedDate, selectedShift],
+    enabled: !!branchId && !!selectedShift && !!shifts,
+    queryFn: async () => {
+      const shiftOrder = shifts?.map((s) => s.id) ?? [];
+      const currentIdx = shiftOrder.indexOf(selectedShift);
+      let prevShiftId: string | null = null;
+      let prevDate = selectedDate;
+      if (currentIdx > 0) {
+        prevShiftId = shiftOrder[currentIdx - 1];
+      } else if (currentIdx === 0 && shiftOrder.length > 0) {
+        prevShiftId = shiftOrder[shiftOrder.length - 1];
+        const d = new Date(selectedDate);
+        d.setDate(d.getDate() - 1);
+        prevDate = format(d, "yyyy-MM-dd");
+      }
+      if (!prevShiftId) return [];
+      const { data, error } = await supabase
+        .from("shift_sales_reports")
+        .select("pump_id, closing_meter")
+        .eq("branch_id", branchId!)
+        .eq("shift_id", prevShiftId)
+        .eq("date", prevDate);
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: existingReadings } = useQuery({
     queryKey: ["existing-meter-readings", branchId, selectedDate, selectedShift],
@@ -74,34 +95,10 @@ export default function MeterReading() {
     },
   });
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!branchId || !selectedShift) throw new Error("Select branch and shift");
-      const entries = (pumps ?? [])
-        .filter((p) => meters[p.id] !== undefined)
-        .map((p) => {
-          const opening = existingReadings?.find((r) => r.pump_id === p.id)?.opening_meter ?? getCarryOverMeter(p.id) ?? 0;
-          return {
-            branch_id: branchId,
-            pump_id: p.id,
-            shift_id: selectedShift,
-            date: selectedDate,
-            opening_meter: opening,
-            closing_meter: meters[p.id],
-            created_by: user?.id,
-          };
-        });
-      if (entries.length === 0) throw new Error("Enter at least one meter reading");
-      const { error } = await supabase.from("shift_sales_reports").upsert(entries, { onConflict: "branch_id,pump_id,shift_id,date" as any });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Meter readings saved");
-      queryClient.invalidateQueries({ queryKey: ["existing-meter-readings"] });
-      setMeters({});
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
+  const getOpeningMeter = (pumpId: string) => {
+    const prev = prevMeters?.find((m) => m.pump_id === pumpId);
+    return prev ? Number(prev.closing_meter) : 0;
+  };
 
   return (
     <AppLayout title="Meter Readings" subtitle="Record opening and closing meter readings per shift">
@@ -135,14 +132,9 @@ export default function MeterReading() {
       {branchId && selectedShift && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Gauge className="h-5 w-5 text-primary" /> Pump Meter Readings
-              </CardTitle>
-              <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                <Save className="h-4 w-4 mr-1" /> Save Readings
-              </Button>
-            </div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Gauge className="h-5 w-5 text-primary" /> Pump Meter Readings
+            </CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -158,9 +150,9 @@ export default function MeterReading() {
               <TableBody>
                 {(pumps ?? []).map((pump) => {
                   const existing = existingReadings?.find((r) => r.pump_id === pump.id);
-                  const opening = existing?.opening_meter ?? getCarryOverMeter(pump.id) ?? 0;
+                  const opening = existing?.opening_meter ?? getOpeningMeter(pump.id);
                   const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
-                  const volume = closing !== "" ? Number(closing) - opening : null;
+                  const volume = closing !== "" ? Number(closing) - Number(opening) : null;
                   return (
                     <TableRow key={pump.id}>
                       <TableCell className="font-medium">{pump.name}</TableCell>
