@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useBranchFilter } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
 
 export default function StockControl() {
-  const [branchFilter, setBranchFilter] = useState("all");
+  const { branchFilter, setBranchFilter, isBranchDisabled } = useBranchFilter();
   const [productFilter, setProductFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -144,10 +145,10 @@ export default function StockControl() {
             </div>
             <div className="space-y-2">
               <Label>Branch</Label>
-              <Select value={branchFilter} onValueChange={setBranchFilter}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={branchFilter} onValueChange={setBranchFilter} disabled={isBranchDisabled}>
+                <SelectTrigger className={isBranchDisabled ? "opacity-70" : ""}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
+                  {!isBranchDisabled && <SelectItem value="all">All Branches</SelectItem>}
                   {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                 </SelectContent>
               </Select>

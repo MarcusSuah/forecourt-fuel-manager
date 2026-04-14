@@ -2,24 +2,16 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranchSelect, useShiftSelect } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +23,6 @@ import { format } from "date-fns";
 
 interface SalesRow {
   key: string;
-  branch_id: string;
-  shift_id: string;
   attendant_id: string;
   island_id: string;
   pump_id: string;
@@ -44,8 +34,6 @@ interface SalesRow {
 
 const emptyRow = (): SalesRow => ({
   key: crypto.randomUUID(),
-  branch_id: "",
-  shift_id: "",
   attendant_id: "",
   island_id: "",
   pump_id: "",
@@ -60,22 +48,13 @@ export default function SalesEntry() {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [rows, setRows] = useState<SalesRow[]>([emptyRow()]);
-  const [globalBranch, setGlobalBranch] = useState("");
-  const [globalShift, setGlobalShift] = useState("");
+  const { selectedBranch: globalBranch, setSelectedBranch: setGlobalBranch, isBranchDisabled } = useBranchSelect();
+  const { shifts, selectedShift: globalShift, setSelectedShift: setGlobalShift } = useShiftSelect();
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
     queryFn: async () => {
       const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: shifts } = useQuery({
-    queryKey: ["shifts"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("shifts").select("*").order("start_time");
       if (error) throw error;
       return data;
     },
@@ -150,55 +129,38 @@ export default function SalesEntry() {
       setRows([emptyRow()]);
       queryClient.invalidateQueries({ queryKey: ["sales-entries"] });
     },
-    onError: (err: Error) => {
-      toast.error("Failed to submit: " + err.message);
-    },
+    onError: (err: Error) => toast.error("Failed to submit: " + err.message),
   });
 
   const updateRow = (key: string, field: keyof SalesRow, value: string) => {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
   };
 
-  // Auto-populate opening meter from previous shift's closing meter
   const handlePumpSelect = useCallback(async (key: string, pumpId: string) => {
     updateRow(key, "pump_id", pumpId);
     if (!pumpId || !date || !globalBranch || !globalShift) return;
     try {
-      // Get shift order
       const { data: allShifts } = await supabase.from("shifts").select("id, start_time").order("start_time");
       if (!allShifts) return;
       const currentIdx = allShifts.findIndex(s => s.id === globalShift);
-      
       let carryOverMeter: number | null = null;
 
-      // Check previous shift same day
       if (currentIdx > 0) {
         const prevShift = allShifts[currentIdx - 1];
         const { data } = await supabase
           .from("shift_sales_reports")
           .select("closing_meter")
-          .eq("pump_id", pumpId)
-          .eq("date", date)
-          .eq("shift_id", prevShift.id)
-          .eq("branch_id", globalBranch)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .eq("pump_id", pumpId).eq("date", date).eq("shift_id", prevShift.id).eq("branch_id", globalBranch)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (data) carryOverMeter = Number(data.closing_meter);
       }
 
-      // Fallback: last entry before this date
       if (carryOverMeter === null) {
         const { data } = await supabase
           .from("shift_sales_reports")
           .select("closing_meter")
-          .eq("pump_id", pumpId)
-          .eq("branch_id", globalBranch)
-          .lte("date", date)
-          .order("date", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .eq("pump_id", pumpId).eq("branch_id", globalBranch).lte("date", date)
+          .order("date", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (data) carryOverMeter = Number(data.closing_meter);
       }
 
@@ -224,10 +186,7 @@ export default function SalesEntry() {
     return { salesUsg, salesLiters, totalUsd };
   };
 
-  const grandTotal = useMemo(
-    () => rows.reduce((sum, r) => sum + calcSales(r).totalUsd, 0),
-    [rows]
-  );
+  const grandTotal = useMemo(() => rows.reduce((sum, r) => sum + calcSales(r).totalUsd, 0), [rows]);
 
   const canSubmit = globalBranch && globalShift && rows.every(
     (r) => r.attendant_id && r.pump_id && r.closing_meter && r.unit_price_usd &&
@@ -239,38 +198,26 @@ export default function SalesEntry() {
     return (pumps ?? []).filter((p) => p.island_id === islandId);
   };
 
-  const handleSubmit = () => {
-    if (!canSubmit) {
-      toast.error("Please fill all required fields and ensure closing > opening meter");
-      return;
-    }
-    submitMutation.mutate(rows);
-  };
-
   return (
     <AppLayout title="Attendant Sales Entry" subtitle="Record pump meter readings and calculate sales per shift">
-      {/* Global Controls */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Receipt className="h-5 w-5 text-primary" />
-            Shift Details
+            <Receipt className="h-5 w-5 text-primary" /> Shift Details
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="space-y-2">
               <Label>Date</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Station / Branch *</Label>
-              <Select value={globalBranch} onValueChange={(v) => { setGlobalBranch(v); setRows([emptyRow()]); }}>
-                <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
+              <Select value={globalBranch} onValueChange={(v) => { setGlobalBranch(v); setRows([emptyRow()]); }} disabled={isBranchDisabled}>
+                <SelectTrigger className={isBranchDisabled ? "opacity-70" : ""}><SelectValue placeholder="Select branch" /></SelectTrigger>
                 <SelectContent>
-                  {branches?.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
+                  {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -279,9 +226,7 @@ export default function SalesEntry() {
               <Select value={globalShift} onValueChange={setGlobalShift}>
                 <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
                 <SelectContent>
-                  {shifts?.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.name} ({s.start_time}–{s.end_time})</SelectItem>
-                  ))}
+                  {shifts?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.start_time}–{s.end_time})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -295,34 +240,30 @@ export default function SalesEntry() {
         </CardContent>
       </Card>
 
-      {/* Entry Rows */}
       {globalBranch && globalShift && (
         <Card className="mb-6">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Calculator className="h-5 w-5 text-primary" />
-                Meter Readings
+                <Calculator className="h-5 w-5 text-primary" /> Meter Readings
               </CardTitle>
-              <Button onClick={addRow} size="sm" variant="outline">
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
+              <Button onClick={addRow} size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Add Row</Button>
             </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="overflow-x-auto -mx-6 px-6">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[140px]">Attendant *</TableHead>
-                  <TableHead className="min-w-[100px]">Island</TableHead>
-                  <TableHead className="min-w-[120px]">Pump *</TableHead>
-                  <TableHead className="min-w-[110px]">Opening Meter</TableHead>
-                  <TableHead className="min-w-[110px]">Closing Meter *</TableHead>
-                  <TableHead className="min-w-[90px]">RTT (USG)</TableHead>
-                  <TableHead className="min-w-[90px]">Sales (USG)</TableHead>
-                  <TableHead className="min-w-[90px]">Sales (L)</TableHead>
-                  <TableHead className="min-w-[100px]">Price/USG *</TableHead>
-                  <TableHead className="min-w-[110px]">Total ($)</TableHead>
+                  <TableHead className="min-w-[120px]">Attendant *</TableHead>
+                  <TableHead className="min-w-[90px]">Island</TableHead>
+                  <TableHead className="min-w-[100px]">Pump *</TableHead>
+                  <TableHead className="min-w-[100px]">Open Meter</TableHead>
+                  <TableHead className="min-w-[100px]">Close Meter *</TableHead>
+                  <TableHead className="min-w-[80px]">RTT</TableHead>
+                  <TableHead className="min-w-[80px]">Sales USG</TableHead>
+                  <TableHead className="min-w-[80px]">Sales L</TableHead>
+                  <TableHead className="min-w-[80px]">Price *</TableHead>
+                  <TableHead className="min-w-[90px]">Total $</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -331,70 +272,39 @@ export default function SalesEntry() {
                   const { salesUsg, salesLiters, totalUsd } = calcSales(row);
                   const availPumps = getPumpsForIsland(row.island_id);
                   const selectedPump = pumps?.find((p) => p.id === row.pump_id);
-
                   return (
                     <TableRow key={row.key}>
                       <TableCell>
                         <Select value={row.attendant_id} onValueChange={(v) => updateRow(row.key, "attendant_id", v)}>
                           <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>
-                            {attendants?.map((a) => (
-                              <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>
-                            ))}
-                          </SelectContent>
+                          <SelectContent>{attendants?.map((a) => <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>)}</SelectContent>
                         </Select>
                       </TableCell>
                       <TableCell>
                         <Select value={row.island_id} onValueChange={(v) => { updateRow(row.key, "island_id", v); updateRow(row.key, "pump_id", ""); }}>
                           <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Any" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all_islands">All Islands</SelectItem>
-                            {islands?.map((i) => (
-                              <SelectItem key={i.id} value={i.id}>Island {i.island_number}</SelectItem>
-                            ))}
+                            <SelectItem value="all_islands">All</SelectItem>
+                            {islands?.map((i) => <SelectItem key={i.id} value={i.id}>Island {i.island_number}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </TableCell>
                       <TableCell>
                         <Select value={row.pump_id} onValueChange={(v) => handlePumpSelect(row.key, v)}>
                           <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>
-                            {availPumps.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
+                          <SelectContent>{availPumps.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                         </Select>
                         {selectedPump && (
-                          <Badge variant="outline" className={cn("mt-1 text-[10px]", selectedPump.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
-                            {selectedPump.product_type}
-                          </Badge>
+                          <Badge variant="outline" className={cn("mt-1 text-[10px]", selectedPump.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>{selectedPump.product_type}</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.opening_meter} onChange={(e) => updateRow(row.key, "opening_meter", e.target.value)} placeholder="0.00" />
-                      </TableCell>
-                      <TableCell>
-                        <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.closing_meter} onChange={(e) => updateRow(row.key, "closing_meter", e.target.value)} placeholder="0.00" />
-                      </TableCell>
-                      <TableCell>
-                        <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.rtt_usg} onChange={(e) => updateRow(row.key, "rtt_usg", e.target.value)} placeholder="0" />
-                      </TableCell>
-                      <TableCell>
-                        <span className={cn("font-semibold text-sm", salesUsg < 0 ? "text-destructive" : "text-foreground")}>
-                          {salesUsg.toFixed(2)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">{salesLiters.toFixed(2)}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.unit_price_usd} onChange={(e) => updateRow(row.key, "unit_price_usd", e.target.value)} placeholder="$0.00" />
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-bold text-sm text-primary">${totalUsd.toFixed(2)}</span>
-                      </TableCell>
+                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.opening_meter} onChange={(e) => updateRow(row.key, "opening_meter", e.target.value)} placeholder="0.00" /></TableCell>
+                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.closing_meter} onChange={(e) => updateRow(row.key, "closing_meter", e.target.value)} placeholder="0.00" /></TableCell>
+                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.rtt_usg} onChange={(e) => updateRow(row.key, "rtt_usg", e.target.value)} placeholder="0" /></TableCell>
+                      <TableCell><span className={cn("font-semibold text-xs", salesUsg < 0 ? "text-destructive" : "")}>{salesUsg.toFixed(2)}</span></TableCell>
+                      <TableCell><span className="text-xs text-muted-foreground">{salesLiters.toFixed(2)}</span></TableCell>
+                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.unit_price_usd} onChange={(e) => updateRow(row.key, "unit_price_usd", e.target.value)} placeholder="$0.00" /></TableCell>
+                      <TableCell><span className="font-bold text-xs text-primary">${totalUsd.toFixed(2)}</span></TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeRow(row.key)}>
                           <Trash2 className="h-4 w-4" />
@@ -405,69 +315,54 @@ export default function SalesEntry() {
                 })}
               </TableBody>
             </Table>
-
             <div className="mt-4 flex items-center justify-between">
-              <Button onClick={addRow} variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-1" /> Add Another Row
-              </Button>
-              <Button onClick={handleSubmit} disabled={!canSubmit || submitMutation.isPending} size="sm">
-                <Save className="h-4 w-4 mr-2" />
-                {submitMutation.isPending ? "Submitting..." : "Submit Entries"}
+              <Button onClick={addRow} variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" /> Add Row</Button>
+              <Button onClick={() => { if (canSubmit) submitMutation.mutate(rows); else toast.error("Fill all required fields"); }} disabled={!canSubmit || submitMutation.isPending} size="sm">
+                <Save className="h-4 w-4 mr-2" /> {submitMutation.isPending ? "Submitting..." : "Submit Entries"}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Today's Submitted Entries */}
       {globalBranch && globalShift && todaysEntries && todaysEntries.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Submitted Entries for {format(new Date(date), "MMM dd, yyyy")}</CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-base">Submitted — {format(new Date(date), "MMM dd, yyyy")}</CardTitle>
               <Button variant="outline" size="sm" onClick={() => {
-                if (!todaysEntries) return;
-                downloadCSV(`sales-entries-${date}.csv`,
-                  ["Attendant", "Pump", "Product", "Opening", "Closing", "RTT", "Sales (USG)", "Price", "Total ($)"],
-                  todaysEntries.map(e => [(e.attendants as any)?.full_name, (e.pumps as any)?.name, (e.pumps as any)?.product_type, Number(e.opening_meter), Number(e.closing_meter), Number(e.rtt_usg), Number(e.sales_usg), Number(e.unit_price_usd), Number(e.total_sales_usd).toFixed(2)])
+                downloadCSV(`sales-${date}.csv`,
+                  ["Attendant", "Pump", "Product", "Open", "Close", "RTT", "Sales USG", "Sales L", "Price", "Total $"],
+                  todaysEntries.map(e => [(e.attendants as any)?.full_name, (e.pumps as any)?.name, (e.pumps as any)?.product_type, Number(e.opening_meter), Number(e.closing_meter), Number(e.rtt_usg), Number(e.sales_usg), Number(e.sales_liters), Number(e.unit_price_usd), Number(e.total_sales_usd)])
                 );
-              }}><Download className="h-4 w-4 mr-1" /> Export CSV</Button>
+              }}><Download className="h-4 w-4 mr-1" /> CSV</Button>
             </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="overflow-x-auto -mx-6 px-6">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Attendant</TableHead>
                   <TableHead>Pump</TableHead>
-                  <TableHead>Island</TableHead>
-                  <TableHead className="text-right">Opening</TableHead>
-                  <TableHead className="text-right">Closing</TableHead>
-                  <TableHead className="text-right">RTT</TableHead>
-                  <TableHead className="text-right">Sales (USG)</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Total ($)</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
+                  <TableHead className="text-right">Close</TableHead>
+                  <TableHead className="text-right">Sales USG</TableHead>
+                  <TableHead className="text-right">Total $</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {todaysEntries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="font-medium">{(entry.attendants as any)?.full_name}</TableCell>
+                {todaysEntries.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="font-medium">{(e.attendants as any)?.full_name}</TableCell>
+                    <TableCell>{(e.pumps as any)?.name}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        {(entry.pumps as any)?.name}
-                        <Badge variant="outline" className={cn("text-[10px]", (entry.pumps as any)?.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
-                          {(entry.pumps as any)?.product_type}
-                        </Badge>
-                      </div>
+                      <Badge variant="outline" className={cn("text-xs", (e.pumps as any)?.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>{(e.pumps as any)?.product_type}</Badge>
                     </TableCell>
-                    <TableCell>{(entry.islands as any)?.island_number ? `Island ${(entry.islands as any).island_number}` : "—"}</TableCell>
-                    <TableCell className="text-right">{Number(entry.opening_meter).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{Number(entry.closing_meter).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{Number(entry.rtt_usg).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold">{Number(entry.sales_usg).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">${Number(entry.unit_price_usd).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-bold text-primary">${Number(entry.total_sales_usd).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{Number(e.opening_meter).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{Number(e.closing_meter).toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-medium">{Number(e.sales_usg).toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-bold text-primary">${Number(e.total_sales_usd).toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

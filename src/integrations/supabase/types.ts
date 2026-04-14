@@ -1206,7 +1206,7 @@ export type Database = {
       app_role: "admin" | "supervisor" | "cashier" | "attendant" | "dealer"
       franchise_type: "Financial Dealer" | "Young Dealer" | "COCO Dealer"
       product_type: "PMS" | "AGO"
-      shift_name: "Morning" | "Afternoon" | "Night"
+      shift_name: "Morning" | "Afternoon" | "Night" | "All Day"
       tank_status: "Full" | "Medium" | "Low" | "Critical"
     }
     CompositeTypes: {
@@ -1338,7 +1338,7 @@ export const Constants = {
       app_role: ["admin", "supervisor", "cashier", "attendant", "dealer"],
       franchise_type: ["Financial Dealer", "Young Dealer", "COCO Dealer"],
       product_type: ["PMS", "AGO"],
-      shift_name: ["Morning", "Afternoon", "Night"],
+      shift_name: ["Morning", "Afternoon", "Night", "All Day"],
       tank_status: ["Full", "Medium", "Low", "Critical"],
     },
   },

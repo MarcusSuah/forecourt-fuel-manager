@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranchFilter, useBranchSelect } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,10 +28,11 @@ export default function Deliveries() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [branchFilter, setBranchFilter] = useState("all");
+  const { branchFilter, setBranchFilter, isBranchDisabled } = useBranchFilter();
+  const { selectedBranch: formBranch, setSelectedBranch: setFormBranch, isBranchDisabled: formBranchDisabled } = useBranchSelect();
 
-  // Form state
-  const [formBranch, setFormBranch] = useState("");
+  // Form state - formBranch handled by useBranchSelect
+  const [formTank, setFormTank] = useState("");
   const [formTank, setFormTank] = useState("");
   const [formQuantity, setFormQuantity] = useState("");
   const [formSupplier, setFormSupplier] = useState("");

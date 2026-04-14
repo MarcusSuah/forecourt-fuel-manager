@@ -1,0 +1,1 @@
+ALTER TYPE public.shift_name ADD VALUE IF NOT EXISTS 'All Day';

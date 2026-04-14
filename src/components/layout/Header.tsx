@@ -1,6 +1,6 @@
 import { Bell, Calendar, MapPin, Fuel } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDealerBranch } from "@/hooks/useDealerBranch";
+import { useDealerBranch, useShiftSelect } from "@/hooks/useDealerBranch";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -21,10 +21,11 @@ interface HeaderProps {
 export function Header({ title, subtitle }: HeaderProps) {
   const { user } = useAuth();
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
+  const { shifts, selectedShift, setSelectedShift } = useShiftSelect();
   const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
+    weekday: "short",
     year: "numeric",
-    month: "long",
+    month: "short",
     day: "numeric",
   });
 
@@ -38,17 +39,8 @@ export function Header({ title, subtitle }: HeaderProps) {
     },
   });
 
-  const { data: shifts } = useQuery({
-    queryKey: ["header-shifts"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("shifts").select("*").order("start_time");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const { data: tankAlerts } = useQuery({
-    queryKey: ["header-tank-alerts"],
+    queryKey: ["header-tank-alerts", dealerBranchId],
     queryFn: async () => {
       let q = supabase
         .from("tanks")
@@ -69,39 +61,38 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="flex items-center gap-2 lg:hidden">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shrink-0">
               <Fuel className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-bold text-foreground hidden sm:inline">FMS</span>
           </div>
           <div className="min-w-0">
-            <h1 className="text-base sm:text-xl font-bold text-foreground truncate">{title}</h1>
-            {subtitle && <p className="text-xs text-muted-foreground truncate hidden sm:block">{subtitle}</p>}
+            <h1 className="text-sm sm:text-xl font-bold text-foreground truncate">{title}</h1>
+            {subtitle && <p className="text-[10px] sm:text-xs text-muted-foreground truncate hidden sm:block">{subtitle}</p>}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Dealer branch label */}
           {isDealer && dealerBranchName && (
-            <Badge variant="outline" className="hidden sm:flex bg-primary/10 text-primary border-primary/30">
+            <Badge variant="outline" className="hidden sm:flex bg-primary/10 text-primary border-primary/30 text-xs">
               <MapPin className="h-3 w-3 mr-1" /> {dealerBranchName}
             </Badge>
           )}
 
-          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
+          <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" />
             <span>{today}</span>
           </div>
 
           {/* Branch selector - hidden for dealers */}
           {!isDealer && (
             <Select defaultValue="all">
-              <SelectTrigger className="w-32 sm:w-44 bg-card hidden sm:flex">
-                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="Select branch" />
+              <SelectTrigger className="w-28 sm:w-40 bg-card hidden sm:flex h-8 sm:h-9 text-xs sm:text-sm">
+                <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                <SelectValue placeholder="Branch" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Branches</SelectItem>
@@ -112,30 +103,25 @@ export function Header({ title, subtitle }: HeaderProps) {
             </Select>
           )}
 
-          <Select defaultValue={shifts?.[0]?.id || "morning"}>
-            <SelectTrigger className="w-28 sm:w-40 bg-card hidden sm:flex">
+          {/* Shift selector - All Day default */}
+          <Select value={selectedShift} onValueChange={setSelectedShift}>
+            <SelectTrigger className="w-24 sm:w-36 bg-card h-8 sm:h-9 text-xs sm:text-sm">
               <SelectValue placeholder="Shift" />
             </SelectTrigger>
             <SelectContent>
               {shifts?.map((shift) => (
                 <SelectItem key={shift.id} value={shift.id}>
                   <span className="font-medium">{shift.name}</span>
-                  <span className="text-xs text-muted-foreground ml-1">({shift.start_time}–{shift.end_time})</span>
+                  <span className="text-[10px] text-muted-foreground ml-1 hidden sm:inline">({shift.start_time}–{shift.end_time})</span>
                 </SelectItem>
-              )) || (
-                <>
-                  <SelectItem value="morning">Morning</SelectItem>
-                  <SelectItem value="afternoon">Afternoon</SelectItem>
-                  <SelectItem value="night">Night</SelectItem>
-                </>
-              )}
+              ))}
             </SelectContent>
           </Select>
 
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="icon" className="bg-card relative">
-                <Bell className="h-4 w-4" />
+              <Button variant="outline" size="icon" className="bg-card relative h-8 w-8 sm:h-9 sm:w-9">
+                <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 {alertCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center">
                     {alertCount}
@@ -143,7 +129,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end">
+            <PopoverContent className="w-72 sm:w-80 p-0" align="end">
               <div className="p-3 border-b border-border">
                 <h4 className="font-semibold text-sm">Notifications</h4>
                 <p className="text-xs text-muted-foreground">{alertCount} active alert{alertCount !== 1 ? "s" : ""}</p>
