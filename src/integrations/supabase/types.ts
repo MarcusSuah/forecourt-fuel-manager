@@ -248,6 +248,79 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_deleted: boolean
+          room_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          room_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          room_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "chat_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_rooms: {
+        Row: {
+          branch_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_rooms_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           branch_id: string | null
@@ -1071,9 +1144,13 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_supervisor: { Args: { _user_id: string }; Returns: boolean }
+      is_dealer_for_branch: {
+        Args: { _branch_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      app_role: "admin" | "supervisor" | "cashier" | "attendant"
+      app_role: "admin" | "supervisor" | "cashier" | "attendant" | "dealer"
       franchise_type: "Financial Dealer" | "Young Dealer" | "COCO Dealer"
       product_type: "PMS" | "AGO"
       shift_name: "Morning" | "Afternoon" | "Night"
@@ -1205,7 +1282,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "supervisor", "cashier", "attendant"],
+      app_role: ["admin", "supervisor", "cashier", "attendant", "dealer"],
       franchise_type: ["Financial Dealer", "Young Dealer", "COCO Dealer"],
       product_type: ["PMS", "AGO"],
       shift_name: ["Morning", "Afternoon", "Night"],

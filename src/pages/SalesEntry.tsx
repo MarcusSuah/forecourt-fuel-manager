@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -159,6 +159,57 @@ export default function SalesEntry() {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
   };
 
+  // Auto-populate opening meter from previous shift's closing meter
+  const handlePumpSelect = useCallback(async (key: string, pumpId: string) => {
+    updateRow(key, "pump_id", pumpId);
+    if (!pumpId || !date || !globalBranch || !globalShift) return;
+    try {
+      // Get shift order
+      const { data: allShifts } = await supabase.from("shifts").select("id, start_time").order("start_time");
+      if (!allShifts) return;
+      const currentIdx = allShifts.findIndex(s => s.id === globalShift);
+      
+      let carryOverMeter: number | null = null;
+
+      // Check previous shift same day
+      if (currentIdx > 0) {
+        const prevShift = allShifts[currentIdx - 1];
+        const { data } = await supabase
+          .from("shift_sales_reports")
+          .select("closing_meter")
+          .eq("pump_id", pumpId)
+          .eq("date", date)
+          .eq("shift_id", prevShift.id)
+          .eq("branch_id", globalBranch)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data) carryOverMeter = Number(data.closing_meter);
+      }
+
+      // Fallback: last entry before this date
+      if (carryOverMeter === null) {
+        const { data } = await supabase
+          .from("shift_sales_reports")
+          .select("closing_meter")
+          .eq("pump_id", pumpId)
+          .eq("branch_id", globalBranch)
+          .lte("date", date)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (data) carryOverMeter = Number(data.closing_meter);
+      }
+
+      if (carryOverMeter !== null) {
+        updateRow(key, "opening_meter", carryOverMeter.toString());
+      }
+    } catch (err) {
+      console.error("Failed to fetch carry-over meter:", err);
+    }
+  }, [date, globalBranch, globalShift]);
+
   const addRow = () => setRows((prev) => [...prev, emptyRow()]);
   const removeRow = (key: string) => setRows((prev) => prev.length > 1 ? prev.filter((r) => r.key !== key) : prev);
 
@@ -305,7 +356,7 @@ export default function SalesEntry() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Select value={row.pump_id} onValueChange={(v) => updateRow(row.key, "pump_id", v)}>
+                        <Select value={row.pump_id} onValueChange={(v) => handlePumpSelect(row.key, v)}>
                           <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
                           <SelectContent>
                             {availPumps.map((p) => (
