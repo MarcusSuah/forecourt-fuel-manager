@@ -24,6 +24,7 @@ import { Constants } from "@/integrations/supabase/types";
 const roleColors: Record<string, string> = {
   admin: "bg-destructive/15 text-destructive border-destructive/30",
   supervisor: "bg-primary/15 text-primary border-primary/30",
+  dealer: "bg-info/15 text-info border-info/30",
   cashier: "bg-success/15 text-success border-success/30",
   attendant: "bg-accent/15 text-accent-foreground border-accent/30",
 };
@@ -31,6 +32,7 @@ const roleColors: Record<string, string> = {
 const roleDescriptions: Record<string, string> = {
   admin: "Full access to all modules, user management, and settings",
   supervisor: "Manage branches, attendants, sales, cash, and stock",
+  dealer: "Full access to own station — tanks, sales, staff, reports",
   cashier: "Record cash deposits and view sales reports",
   attendant: "Enter shift sales and view own assignments",
 };

@@ -162,6 +162,7 @@ export default function Login() {
                       <SelectContent>
                         <SelectItem value="admin">Admin — Full system access</SelectItem>
                         <SelectItem value="supervisor">Supervisor — Branch management</SelectItem>
+                        <SelectItem value="dealer">Dealer — Full access to own station</SelectItem>
                         <SelectItem value="cashier">Cashier — Cash & sales reports</SelectItem>
                         <SelectItem value="attendant">Attendant — Shift sales entry</SelectItem>
                       </SelectContent>
@@ -257,7 +258,7 @@ export default function Login() {
             <div className="pt-6 border-t border-border">
               <p className="text-sm text-muted-foreground mb-3">Available roles in FMS:</p>
               <div className="flex flex-wrap gap-2">
-                {["Admin", "Supervisor", "Cashier", "Attendant"].map((role) => (
+                {["Admin", "Supervisor", "Dealer", "Cashier", "Attendant"].map((role) => (
                   <span
                     key={role}
                     className="px-3 py-1.5 text-sm rounded-lg bg-muted text-muted-foreground"

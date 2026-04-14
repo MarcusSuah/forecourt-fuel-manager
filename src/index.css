@@ -53,9 +53,9 @@
     --tank-low: 0 84% 60%;
     --tank-critical: 0 72% 51%;
 
-    /* Fuel Product Colors */
-    --fuel-pms: 32 95% 44%;
-    --fuel-ago: 217 91% 40%;
+    /* Fuel Product Colors - PMS (Petrol) = Blue, AGO (Diesel) = Orange */
+    --fuel-pms: 217 91% 40%;
+    --fuel-ago: 32 95% 44%;
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
