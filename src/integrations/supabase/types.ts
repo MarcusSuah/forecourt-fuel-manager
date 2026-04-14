@@ -1144,6 +1144,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_supervisor: { Args: { _user_id: string }; Returns: boolean }
+      is_dealer_for_branch: {
+        Args: { _branch_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "supervisor" | "cashier" | "attendant" | "dealer"
