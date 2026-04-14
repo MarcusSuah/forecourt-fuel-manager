@@ -356,7 +356,7 @@ export default function SalesEntry() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Select value={row.pump_id} onValueChange={(v) => updateRow(row.key, "pump_id", v)}>
+                        <Select value={row.pump_id} onValueChange={(v) => handlePumpSelect(row.key, v)}>
                           <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
                           <SelectContent>
                             {availPumps.map((p) => (
