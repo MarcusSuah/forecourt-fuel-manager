@@ -23,6 +23,7 @@ import HRM from "./pages/HRM";
 import Payroll from "./pages/Payroll";
 import ProfitLoss from "./pages/ProfitLoss";
 import FinancialSituation from "./pages/FinancialSituation";
+import Chat from "./pages/Chat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -133,6 +134,7 @@ const App = () => (
             <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
             <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
             <Route path="/financial-situation" element={<ProtectedRoute><FinancialSituation /></ProtectedRoute>} />
+            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

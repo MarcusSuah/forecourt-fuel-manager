@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Fuel, Users, Building2, Receipt, Wallet,
   FileBarChart, Settings, ChevronLeft, ChevronRight, Droplets,
   TrendingUp, LogOut, ShieldCheck, Truck, UserCog, CalendarDays,
-  DollarSign, PieChart, Landmark,
+  DollarSign, PieChart, Landmark, MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +26,7 @@ const navigation = [
   { name: "Attendants", href: "/attendants", icon: Users },
   { name: "Analytics", href: "/analytics", icon: TrendingUp },
   { name: "Admin", href: "/admin", icon: ShieldCheck },
+  { name: "Chat", href: "/chat", icon: MessageCircle },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
