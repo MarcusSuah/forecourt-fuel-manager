@@ -33,7 +33,6 @@ export default function Deliveries() {
 
   // Form state - formBranch handled by useBranchSelect
   const [formTank, setFormTank] = useState("");
-  const [formTank, setFormTank] = useState("");
   const [formQuantity, setFormQuantity] = useState("");
   const [formSupplier, setFormSupplier] = useState("");
   const [formDriver, setFormDriver] = useState("");
