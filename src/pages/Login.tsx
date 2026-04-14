@@ -19,7 +19,7 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("attendant");
   const navigate = useNavigate();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, signIn, signUp } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -30,20 +30,6 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      if (isSignUp) {
-        const { signUp } = await import("@/contexts/AuthContext").then(() => ({ signUp: useAuth }));
-        // Use signUp from context directly
-      } else {
-        // handled below
-      }
-    } catch {
-      // fallthrough
-    }
-
-    // Reset and use context methods directly
     setIsLoading(true);
 
     try {
@@ -61,7 +47,7 @@ export default function Login() {
           toast.error(error.message);
         } else {
           toast.success("Welcome back!");
-          // Navigation handled by useEffect above when user state updates
+          // Navigation handled by useEffect when user state updates
         }
       }
     } catch (error) {
@@ -70,8 +56,6 @@ export default function Login() {
       setIsLoading(false);
     }
   };
-
-  const { signIn, signUp } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
@@ -112,7 +96,6 @@ export default function Login() {
       {/* Right Side - Login Form */}
       <div className="flex-1 flex items-center justify-center p-4 sm:p-8 bg-background">
         <div className="w-full max-w-md space-y-6 sm:space-y-8">
-          {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
               <Fuel className="h-6 w-6 text-primary-foreground" />
