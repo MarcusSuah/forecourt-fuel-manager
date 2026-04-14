@@ -24,6 +24,10 @@ import Payroll from "./pages/Payroll";
 import ProfitLoss from "./pages/ProfitLoss";
 import FinancialSituation from "./pages/FinancialSituation";
 import Chat from "./pages/Chat";
+import Permissions from "./pages/Permissions";
+import TankDipping from "./pages/TankDipping";
+import MeterReading from "./pages/MeterReading";
+import ShiftStockReport from "./pages/ShiftStockReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,95 +43,17 @@ const App = () => (
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
             
-            {/* Protected Routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/tanks"
-              element={
-                <ProtectedRoute>
-                  <Tanks />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/branches"
-              element={
-                <ProtectedRoute>
-                  <Branches />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/sales"
-              element={
-                <ProtectedRoute>
-                  <SalesEntry />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cash"
-              element={
-                <ProtectedRoute>
-                  <CashReports />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/stock"
-              element={
-                <ProtectedRoute>
-                  <StockControl />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute>
-                  <Reports />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/attendants"
-              element={
-                <ProtectedRoute>
-                  <Attendants />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/analytics"
-              element={
-                <ProtectedRoute>
-                  <Analytics />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <AdminUsers />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/deliveries"
-              element={
-                <ProtectedRoute>
-                  <Deliveries />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/tanks" element={<ProtectedRoute><Tanks /></ProtectedRoute>} />
+            <Route path="/branches" element={<ProtectedRoute><Branches /></ProtectedRoute>} />
+            <Route path="/sales" element={<ProtectedRoute><SalesEntry /></ProtectedRoute>} />
+            <Route path="/cash" element={<ProtectedRoute><CashReports /></ProtectedRoute>} />
+            <Route path="/stock" element={<ProtectedRoute><StockControl /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/attendants" element={<ProtectedRoute><Attendants /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
+            <Route path="/deliveries" element={<ProtectedRoute><Deliveries /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
             <Route path="/hrm" element={<ProtectedRoute><HRM /></ProtectedRoute>} />
@@ -135,6 +61,10 @@ const App = () => (
             <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
             <Route path="/financial-situation" element={<ProtectedRoute><FinancialSituation /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            <Route path="/permissions" element={<ProtectedRoute><Permissions /></ProtectedRoute>} />
+            <Route path="/tank-dipping" element={<ProtectedRoute><TankDipping /></ProtectedRoute>} />
+            <Route path="/meter-reading" element={<ProtectedRoute><MeterReading /></ProtectedRoute>} />
+            <Route path="/shift-stock-report" element={<ProtectedRoute><ShiftStockReport /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
