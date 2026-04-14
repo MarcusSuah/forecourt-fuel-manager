@@ -8,7 +8,7 @@ import { TankCard } from "@/components/dashboard/TankCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -114,6 +114,18 @@ export default function Tanks() {
       queryClient.invalidateQueries({ queryKey: ["tanks"] });
       setEditDialogOpen(false);
       setEditingTank(null);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const deactivateTankMutation = useMutation({
+    mutationFn: async (tankId: string) => {
+      const { error } = await supabase.from("tanks").update({ is_active: false }).eq("id", tankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Tank deactivated");
+      queryClient.invalidateQueries({ queryKey: ["tanks"] });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -299,16 +311,29 @@ export default function Tanks() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredTanks.map((tank) => (
-            <TankCard
-              key={tank.id}
-              name={tank.name}
-              product={tank.product_type}
-              capacity={Number(tank.capacity_usg)}
-              currentLevel={Number(tank.current_level_usg)}
-              branch={(tank.branches as any)?.name ?? "Unknown"}
-              lastUpdated={getTimeSince(tank.updated_at)}
-              onEdit={() => handleEdit(tank)}
-            />
+            <div key={tank.id} className="relative group">
+              <TankCard
+                name={tank.name}
+                product={tank.product_type}
+                capacity={Number(tank.capacity_usg)}
+                currentLevel={Number(tank.current_level_usg)}
+                branch={(tank.branches as any)?.name ?? "Unknown"}
+                lastUpdated={getTimeSince(tank.updated_at)}
+                onEdit={() => handleEdit(tank)}
+              />
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => {
+                  if (confirm(`Deactivate tank "${tank.name}"?`)) {
+                    deactivateTankMutation.mutate(tank.id);
+                  }
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           ))}
         </div>
       )}

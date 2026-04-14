@@ -121,7 +121,7 @@ export default function TankDipping() {
           created_by: user?.id,
         }));
       if (entries.length === 0) throw new Error("Enter at least one dip reading");
-      const { error } = await supabase.from("stock_readings").upsert(entries, { onConflict: "branch_id,tank_id,shift_id,date" as any });
+      const { error } = await supabase.from("stock_readings").upsert(entries, { onConflict: "branch_id,tank_id,shift_id,date" });
       if (error) throw error;
     },
     onSuccess: () => {
