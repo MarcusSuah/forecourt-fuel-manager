@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useBranchFilter } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,7 +58,7 @@ const periodPresets = [
 export default function Reports() {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [branchFilter, setBranchFilter] = useState("all");
+  const { branchFilter, setBranchFilter, isBranchDisabled } = useBranchFilter();
   const [statusFilter, setStatusFilter] = useState("all");
   const [reportGenerated, setReportGenerated] = useState(false);
   const [activeTab, setActiveTab] = useState("daily");
@@ -247,7 +248,7 @@ export default function Reports() {
             </div>
             <div className="space-y-2">
               <Label>Branch</Label>
-              <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setReportGenerated(false); }}>
+              <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setReportGenerated(false); }} disabled={isBranchDisabled}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Branches</SelectItem>

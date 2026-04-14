@@ -10,31 +10,32 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Branches", href: "/branches", icon: Building2 },
-  { name: "Tank Management", href: "/tanks", icon: Droplets },
-  { name: "Tank Dipping", href: "/tank-dipping", icon: Droplets },
-  { name: "Meter Readings", href: "/meter-reading", icon: Gauge },
-  { name: "Shift Stock Report", href: "/shift-stock-report", icon: ClipboardList },
-  { name: "Sales Entry", href: "/sales", icon: Receipt },
-  { name: "Cash Reports", href: "/cash", icon: Wallet },
-  { name: "Stock Control", href: "/stock", icon: Fuel },
-  { name: "Deliveries", href: "/deliveries", icon: Truck },
-  { name: "Employees", href: "/employees", icon: UserCog },
-  { name: "HRM", href: "/hrm", icon: CalendarDays },
-  { name: "Payroll", href: "/payroll", icon: DollarSign },
-  { name: "Profit & Loss", href: "/profit-loss", icon: PieChart },
-  { name: "Financial", href: "/financial-situation", icon: Landmark },
-  { name: "Reports", href: "/reports", icon: FileBarChart },
-  { name: "Attendants", href: "/attendants", icon: Users },
-  { name: "Analytics", href: "/analytics", icon: TrendingUp },
-  { name: "Permissions", href: "/permissions", icon: Lock },
-  { name: "Admin", href: "/admin", icon: ShieldCheck },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: null },
+  { name: "Branches", href: "/branches", icon: Building2, permission: "branches.view" },
+  { name: "Tank Management", href: "/tanks", icon: Droplets, permission: "tanks.view" },
+  { name: "Tank Dipping", href: "/tank-dipping", icon: Droplets, permission: "tanks.view" },
+  { name: "Meter Readings", href: "/meter-reading", icon: Gauge, permission: "sales.view" },
+  { name: "Shift Stock Report", href: "/shift-stock-report", icon: ClipboardList, permission: "stock.view" },
+  { name: "Sales Entry", href: "/sales", icon: Receipt, permission: "sales.manage" },
+  { name: "Cash Reports", href: "/cash", icon: Wallet, permission: "cash.manage" },
+  { name: "Stock Control", href: "/stock", icon: Fuel, permission: "stock.view" },
+  { name: "Deliveries", href: "/deliveries", icon: Truck, permission: "deliveries.view" },
+  { name: "Employees", href: "/employees", icon: UserCog, permission: "employees.view" },
+  { name: "HRM", href: "/hrm", icon: CalendarDays, permission: "employees.view" },
+  { name: "Payroll", href: "/payroll", icon: DollarSign, permission: "payroll.view" },
+  { name: "Profit & Loss", href: "/profit-loss", icon: PieChart, permission: "financials.view" },
+  { name: "Financial", href: "/financial-situation", icon: Landmark, permission: "financials.view" },
+  { name: "Reports", href: "/reports", icon: FileBarChart, permission: "reports.view" },
+  { name: "Attendants", href: "/attendants", icon: Users, permission: "attendants.view" },
+  { name: "Analytics", href: "/analytics", icon: TrendingUp, permission: "analytics.view" },
+  { name: "Permissions", href: "/permissions", icon: Lock, permission: "permissions.manage" },
+  { name: "Admin", href: "/admin", icon: ShieldCheck, permission: "admin.manage" },
+  { name: "Chat", href: "/chat", icon: MessageCircle, permission: null },
+  { name: "Settings", href: "/settings", icon: Settings, permission: null },
 ];
 
 interface SidebarProps {
@@ -47,6 +48,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { isDealer, dealerBranchName } = useDealerBranch();
+  const { hasPermission } = usePermissions();
 
   const handleSignOut = async () => {
     await signOut();
@@ -55,6 +57,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   const getInitials = (name: string) =>
     name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+
+  // Filter navigation based on permissions
+  const visibleNav = navigation.filter(item => {
+    // Items with no permission are always visible
+    if (!item.permission) return true;
+    // Admin sees everything
+    if (user?.role === "admin") return true;
+    // Check permission
+    return hasPermission(item.permission);
+  });
 
   return (
     <aside
@@ -85,7 +97,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         </button>
       </div>
 
-      {/* Dealer branch indicator */}
       {isDealer && dealerBranchName && !collapsed && (
         <div className="px-3 py-2 border-b border-sidebar-border">
           <Badge variant="outline" className="w-full justify-center text-xs bg-primary/10 text-primary border-primary/30">
@@ -96,7 +107,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
       <nav className="flex-1 overflow-y-auto py-4 px-3">
         <ul className="space-y-1">
-          {navigation.map((item) => {
+          {visibleNav.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <li key={item.name}>
