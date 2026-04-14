@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { Droplets } from "lucide-react";
+import { Droplets, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TankCardProps {
   name: string;
@@ -8,6 +9,7 @@ interface TankCardProps {
   currentLevel: number;
   branch: string;
   lastUpdated?: string;
+  onEdit?: () => void;
 }
 
 export function TankCard({
@@ -17,6 +19,7 @@ export function TankCard({
   currentLevel,
   branch,
   lastUpdated,
+  onEdit,
 }: TankCardProps) {
   const percentage = Math.round((currentLevel / capacity) * 100);
 
@@ -77,14 +80,21 @@ export function TankCard({
             <p className="text-sm text-muted-foreground">{branch}</p>
           </div>
         </div>
-        <span
-          className={cn(
-            "px-2.5 py-1 rounded-full text-xs font-semibold uppercase",
-            product === "PMS" ? "bg-fuel-pms/15 text-fuel-pms" : "bg-fuel-ago/15 text-fuel-ago"
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "px-2.5 py-1 rounded-full text-xs font-semibold uppercase",
+              product === "PMS" ? "bg-fuel-pms/15 text-fuel-pms" : "bg-fuel-ago/15 text-fuel-ago"
+            )}
+          >
+            {product}
+          </span>
+          {onEdit && (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+              <Pencil className="h-4 w-4" />
+            </Button>
           )}
-        >
-          {product}
-        </span>
+        </div>
       </div>
 
       {/* Tank Level Visualization */}
@@ -95,14 +105,13 @@ export function TankCard({
             productColors[product],
             "opacity-80"
           )}
-          style={{ height: `${percentage}%` }}
+          style={{ height: `${Math.min(percentage, 100)}%` }}
         />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
             <span className="text-3xl font-bold text-foreground">{percentage}%</span>
           </div>
         </div>
-        {/* Level Lines */}
         <div className="absolute left-0 right-0 top-[30%] border-t border-dashed border-foreground/10" />
         <div className="absolute left-0 right-0 top-[70%] border-t border-dashed border-foreground/10" />
       </div>
