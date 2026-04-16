@@ -27,7 +27,7 @@ import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
 import { format, differenceInYears } from "date-fns";
 import { cn } from "@/lib/utils";
-import { EmployeeIDCard } from "@/components/employees/EmployeeIDCard";
+import { EmployeeIDCard, BulkPrintIDCards } from "@/components/employees/EmployeeIDCard";
 
 const POSITIONS = [
   "Station Manager", "Supervisor", "Cashier", "Pump Attendant",
@@ -224,6 +224,15 @@ export default function Employees() {
               exportTableToPDF("Employee Registry", `${filtered.length} employees`, ["Full Name","Position","Status","Phone","Salary","Branch"],
                 filtered.map(e => [e.full_name, e.position, (e as any).employment_status || "active", e.phone || "—", `$${Number(e.gross_salary).toLocaleString()}`, (e as any).branches?.name || "—"]));
             }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
+            {filtered && filtered.length > 0 && (
+              <BulkPrintIDCards
+                employees={filtered.map(e => ({ ...e, employment_status: (e as any).employment_status || "active", employee_id: (e as any).employee_id }))}
+                getBranchName={(emp) => {
+                  const found = filtered.find(e => e.full_name === emp.full_name);
+                  return (found as any)?.branches?.name || "Station";
+                }}
+              />
+            )}
             <Dialog open={open} onOpenChange={v => { if (!v) closeDialog(); else setOpen(true); }}>
               <DialogTrigger asChild>
                 <Button><Plus className="h-4 w-4 mr-1" /> Add Employee</Button>
