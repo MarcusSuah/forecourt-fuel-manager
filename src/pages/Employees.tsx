@@ -18,24 +18,55 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Plus, Users, Search, Download, FileText } from "lucide-react";
+import { Plus, Users, Search, Download, FileText, Edit2, Trash2, MoreHorizontal, Eye, Upload } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
 import { format, differenceInYears } from "date-fns";
+import { cn } from "@/lib/utils";
+import { EmployeeIDCard } from "@/components/employees/EmployeeIDCard";
+
+const POSITIONS = [
+  "Station Manager", "Supervisor", "Cashier", "Pump Attendant",
+  "Mechanic", "Shop Attendant", "Security", "Driver", "Cleaner",
+];
+
+const STATUS_OPTIONS = ["active", "suspended", "terminated"] as const;
+
+const statusColors: Record<string, string> = {
+  active: "bg-success/15 text-success border-success/30",
+  suspended: "bg-warning/15 text-warning border-warning/30",
+  terminated: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
+type FormState = {
+  full_name: string; position: string; date_of_birth: string; employment_date: string;
+  gender: string; gross_salary: string; social_security_number: string; phone: string;
+  employment_status: string;
+};
+
+const emptyForm: FormState = {
+  full_name: "", position: "", date_of_birth: "", employment_date: "",
+  gender: "", gross_salary: "", social_security_number: "", phone: "",
+  employment_status: "active",
+};
 
 export default function Employees() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewEmployee, setViewEmployee] = useState<any>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const { branchFilter, setBranchFilter, isBranchDisabled } = useBranchFilter();
   const { selectedBranch: formBranch, setSelectedBranch: setFormBranch, isBranchDisabled: formBranchDisabled } = useBranchSelect();
-
-  const [form, setForm] = useState({
-    full_name: "", position: "", date_of_birth: "", employment_date: "",
-    gender: "", gross_salary: "", social_security_number: "", phone: "",
-  });
+  const [form, setForm] = useState<FormState>({ ...emptyForm });
 
   const { data: employees, isLoading } = useQuery({
     queryKey: ["employees"],
@@ -58,49 +89,104 @@ export default function Employees() {
     },
   });
 
-  const addMutation = useMutation({
-    mutationFn: async (emp: any) => {
-      const { error } = await supabase.from("employees").insert(emp);
-      if (error) throw error;
+  const uploadPhoto = async (employeeId: string): Promise<string | null> => {
+    if (!photoFile) return null;
+    const ext = photoFile.name.split('.').pop();
+    const path = `${employeeId}.${ext}`;
+    const { error } = await supabase.storage.from("employee-photos").upload(path, photoFile, { upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from("employee-photos").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!form.full_name.trim() || !form.position.trim()) throw new Error("Full name and position are required");
+      const payload: any = {
+        full_name: form.full_name, position: form.position,
+        date_of_birth: form.date_of_birth || null,
+        employment_date: form.employment_date || new Date().toISOString().split("T")[0],
+        gender: form.gender || null, gross_salary: parseFloat(form.gross_salary) || 0,
+        social_security_number: form.social_security_number || null,
+        phone: form.phone || null, branch_id: formBranch || null,
+        employment_status: form.employment_status || "active",
+      };
+
+      if (editingId) {
+        if (photoFile) {
+          payload.photo_url = await uploadPhoto(editingId);
+        }
+        const { error } = await supabase.from("employees").update(payload).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from("employees").insert(payload).select("id").single();
+        if (error) throw error;
+        if (photoFile && data) {
+          const url = await uploadPhoto(data.id);
+          if (url) await supabase.from("employees").update({ photo_url: url }).eq("id", data.id);
+        }
+      }
     },
     onSuccess: () => {
-      toast.success("Employee added");
+      toast.success(editingId ? "Employee updated" : "Employee added");
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      setOpen(false);
-      setForm({ full_name: "", position: "", date_of_birth: "", employment_date: "", gender: "", gross_salary: "", social_security_number: "", phone: "" });
+      closeDialog();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const handleSubmit = () => {
-    if (!form.full_name.trim() || !form.position.trim()) {
-      toast.error("Full name and position are required"); return;
-    }
-    addMutation.mutate({
-      full_name: form.full_name, position: form.position,
-      date_of_birth: form.date_of_birth || null,
-      employment_date: form.employment_date || new Date().toISOString().split("T")[0],
-      gender: form.gender || null, gross_salary: parseFloat(form.gross_salary) || 0,
-      social_security_number: form.social_security_number || null,
-      phone: form.phone || null,
-      branch_id: formBranch || null,
-    });
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("employees").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Employee deleted");
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("employees").update({ employment_status: status } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Status updated");
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const closeDialog = () => {
+    setOpen(false);
+    setEditingId(null);
+    setForm({ ...emptyForm });
+    setPhotoFile(null);
   };
 
-  const filteredByBranch = branchFilter === "all"
-    ? employees
-    : employees?.filter(e => e.branch_id === branchFilter);
+  const openEdit = (emp: any) => {
+    setEditingId(emp.id);
+    setForm({
+      full_name: emp.full_name, position: emp.position,
+      date_of_birth: emp.date_of_birth || "", employment_date: emp.employment_date || "",
+      gender: emp.gender || "", gross_salary: String(emp.gross_salary || ""),
+      social_security_number: emp.social_security_number || "", phone: emp.phone || "",
+      employment_status: (emp as any).employment_status || "active",
+    });
+    if (emp.branch_id) setFormBranch(emp.branch_id);
+    setOpen(true);
+  };
 
-  const filtered = filteredByBranch?.filter(e =>
+  const filteredByBranch = branchFilter === "all" ? employees : employees?.filter(e => e.branch_id === branchFilter);
+  const filteredByStatus = statusFilter === "all" ? filteredByBranch : filteredByBranch?.filter(e => (e as any).employment_status === statusFilter);
+  const filtered = filteredByStatus?.filter(e =>
     e.full_name.toLowerCase().includes(search.toLowerCase()) ||
     e.position.toLowerCase().includes(search.toLowerCase())
   );
 
-  const getAge = (dob: string | null) => {
-    if (!dob) return "—";
-    return differenceInYears(new Date(), new Date(dob));
-  };
-
+  const getAge = (dob: string | null) => dob ? differenceInYears(new Date(), new Date(dob)) : "—";
   const getYearsOfService = (empDate: string) => differenceInYears(new Date(), new Date(empDate));
 
   return (
@@ -119,45 +205,69 @@ export default function Employees() {
                 {branches?.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-36"><SelectValue placeholder="All Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => {
               if (!filtered?.length) return toast.error("No data to export");
-              downloadCSV("employees.csv", ["Full Name","Position","Gender","Age","Employment Date","Years of Service","Gross Salary","SSN","Branch"],
-                filtered.map(e => [e.full_name, e.position, e.gender || "", String(getAge(e.date_of_birth)), e.employment_date, String(getYearsOfService(e.employment_date)), String(e.gross_salary), e.social_security_number || "", (e as any).branches?.name || ""]));
+              downloadCSV("employees.csv", ["Full Name","Position","Status","Phone","Gender","Age","Employment Date","Years of Service","Gross Salary","SSN","Branch"],
+                filtered.map(e => [e.full_name, e.position, (e as any).employment_status || "active", e.phone || "", e.gender || "", String(getAge(e.date_of_birth)), e.employment_date, String(getYearsOfService(e.employment_date)), String(e.gross_salary), e.social_security_number || "", (e as any).branches?.name || ""]));
             }}><Download className="h-4 w-4 mr-1" /> CSV</Button>
             <Button variant="outline" size="sm" onClick={() => {
               if (!filtered?.length) return toast.error("No data to export");
-              exportTableToPDF("Employee Registry", `${filtered.length} employees`, ["Full Name","Position","Gender","Age","Emp. Date","Service","Salary","SSN","Branch"],
-                filtered.map(e => [e.full_name, e.position, e.gender || "—", String(getAge(e.date_of_birth)), e.employment_date, `${getYearsOfService(e.employment_date)} yrs`, `$${Number(e.gross_salary).toLocaleString()}`, e.social_security_number || "—", (e as any).branches?.name || "—"]));
+              exportTableToPDF("Employee Registry", `${filtered.length} employees`, ["Full Name","Position","Status","Phone","Salary","Branch"],
+                filtered.map(e => [e.full_name, e.position, (e as any).employment_status || "active", e.phone || "—", `$${Number(e.gross_salary).toLocaleString()}`, (e as any).branches?.name || "—"]));
             }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={v => { if (!v) closeDialog(); else setOpen(true); }}>
               <DialogTrigger asChild>
                 <Button><Plus className="h-4 w-4 mr-1" /> Add Employee</Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader><DialogTitle>Add New Employee</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{editingId ? "Edit Employee" : "Add New Employee"}</DialogTitle></DialogHeader>
                 <div className="space-y-3">
+                  {/* Photo Upload */}
+                  <div className="space-y-1">
+                    <Label>Profile Photo</Label>
+                    <div className="flex items-center gap-3">
+                      {(editingId && employees?.find(e => e.id === editingId)?.photo_url) ? (
+                        <img src={employees?.find(e => e.id === editingId)?.photo_url!} className="w-14 h-14 rounded-full object-cover border-2 border-primary/30" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center border-2 border-dashed">
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <Input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files?.[0] || null)} className="flex-1" />
+                    </div>
+                  </div>
                   <div className="space-y-1">
                     <Label>Full Name *</Label>
                     <Input value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
                   </div>
-                  <div className="space-y-1">
-                    <Label>Current Position *</Label>
-                    <Select value={form.position} onValueChange={v => setForm(f => ({ ...f, position: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Station Manager">Station Manager</SelectItem>
-                        <SelectItem value="Supervisor">Supervisor</SelectItem>
-                        <SelectItem value="Cashier">Cashier</SelectItem>
-                        <SelectItem value="Pump Attendant">Pump Attendant</SelectItem>
-                        <SelectItem value="Mechanic">Mechanic</SelectItem>
-                        <SelectItem value="Shop Attendant">Shop Attendant</SelectItem>
-                        <SelectItem value="Security">Security</SelectItem>
-                        <SelectItem value="Driver">Driver</SelectItem>
-                        <SelectItem value="Cleaner">Cleaner</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Position *</Label>
+                      <Select value={form.position} onValueChange={v => setForm(f => ({ ...f, position: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Select position" /></SelectTrigger>
+                        <SelectContent>
+                          {POSITIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Status</Label>
+                      <Select value={form.employment_status} onValueChange={v => setForm(f => ({ ...f, employment_status: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -204,14 +314,50 @@ export default function Employees() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button onClick={handleSubmit} className="w-full" disabled={addMutation.isPending}>
-                    Add Employee
+                  <Button onClick={() => saveMutation.mutate()} className="w-full" disabled={saveMutation.isPending}>
+                    {editingId ? "Save Changes" : "Add Employee"}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
         </div>
+
+        {/* View Employee Dialog */}
+        <Dialog open={!!viewEmployee} onOpenChange={v => { if (!v) setViewEmployee(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Employee Details</DialogTitle></DialogHeader>
+            {viewEmployee && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  {viewEmployee.photo_url ? (
+                    <img src={viewEmployee.photo_url} className="w-20 h-20 rounded-full object-cover border-2 border-primary/30" />
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center text-3xl">👤</div>
+                  )}
+                  <div>
+                    <h3 className="text-lg font-semibold">{viewEmployee.full_name}</h3>
+                    <Badge variant="outline" className="capitalize">{viewEmployee.position}</Badge>
+                    <Badge variant="outline" className={cn("ml-2 capitalize", statusColors[(viewEmployee as any).employment_status || "active"])}>
+                      {(viewEmployee as any).employment_status || "active"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-muted-foreground">Phone:</span> {viewEmployee.phone || "—"}</div>
+                  <div><span className="text-muted-foreground">Gender:</span> {viewEmployee.gender || "—"}</div>
+                  <div><span className="text-muted-foreground">DOB:</span> {viewEmployee.date_of_birth ? format(new Date(viewEmployee.date_of_birth), "MMM dd, yyyy") : "—"}</div>
+                  <div><span className="text-muted-foreground">Age:</span> {getAge(viewEmployee.date_of_birth)}</div>
+                  <div><span className="text-muted-foreground">Employed:</span> {format(new Date(viewEmployee.employment_date), "MMM dd, yyyy")}</div>
+                  <div><span className="text-muted-foreground">Service:</span> {getYearsOfService(viewEmployee.employment_date)} yrs</div>
+                  <div><span className="text-muted-foreground">Salary:</span> ${Number(viewEmployee.gross_salary).toLocaleString()}</div>
+                  <div><span className="text-muted-foreground">SSN:</span> {viewEmployee.social_security_number || "—"}</div>
+                  <div className="col-span-2"><span className="text-muted-foreground">Branch:</span> {(viewEmployee as any).branches?.name || "—"}</div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Card>
           <CardHeader>
@@ -224,37 +370,80 @@ export default function Employees() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                     <TableHead>Full Name</TableHead>
-                     <TableHead>Position</TableHead>
-                     <TableHead className="hidden md:table-cell">Phone</TableHead>
-                     <TableHead className="hidden md:table-cell">Gender</TableHead>
-                     <TableHead className="hidden md:table-cell">Age</TableHead>
-                     <TableHead className="hidden lg:table-cell">Employment Date</TableHead>
-                     <TableHead className="hidden lg:table-cell">Years of Service</TableHead>
-                     <TableHead>Gross Salary</TableHead>
-                     <TableHead className="hidden xl:table-cell">SSN</TableHead>
-                     <TableHead className="hidden md:table-cell">Branch</TableHead>
-                   </TableRow>
+                    <TableHead>Photo</TableHead>
+                    <TableHead>Full Name</TableHead>
+                    <TableHead>Position</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden md:table-cell">Phone</TableHead>
+                    <TableHead className="hidden lg:table-cell">Age</TableHead>
+                    <TableHead>Salary</TableHead>
+                    <TableHead className="hidden md:table-cell">Branch</TableHead>
+                    <TableHead className="w-28">Actions</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                   ) : !filtered?.length ? (
-                    <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No employees found</TableCell></TableRow>
-                  ) : filtered.map(emp => (
-                    <TableRow key={emp.id}>
-                      <TableCell className="font-medium">{emp.full_name}</TableCell>
-                       <TableCell><Badge variant="outline">{emp.position}</Badge></TableCell>
-                       <TableCell className="hidden md:table-cell">{(emp as any).phone || "—"}</TableCell>
-                       <TableCell className="hidden md:table-cell">{emp.gender || "—"}</TableCell>
-                      <TableCell className="hidden md:table-cell">{getAge(emp.date_of_birth)}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{format(new Date(emp.employment_date), "MMM dd, yyyy")}</TableCell>
-                      <TableCell className="hidden lg:table-cell">{getYearsOfService(emp.employment_date)} yrs</TableCell>
-                      <TableCell>${Number(emp.gross_salary).toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-xs hidden xl:table-cell">{emp.social_security_number || "—"}</TableCell>
-                      <TableCell className="hidden md:table-cell">{(emp as any).branches?.name || "—"}</TableCell>
-                    </TableRow>
-                  ))}
+                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No employees found</TableCell></TableRow>
+                  ) : filtered.map(emp => {
+                    const empStatus = (emp as any).employment_status || "active";
+                    return (
+                      <TableRow key={emp.id} className={empStatus !== "active" ? "opacity-60" : ""}>
+                        <TableCell>
+                          {emp.photo_url ? (
+                            <img src={emp.photo_url} className="w-9 h-9 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-sm">👤</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{emp.full_name}</TableCell>
+                        <TableCell><Badge variant="outline">{emp.position}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn("capitalize text-xs", statusColors[empStatus])}>
+                            {empStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">{emp.phone || "—"}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{getAge(emp.date_of_birth)}</TableCell>
+                        <TableCell>${Number(emp.gross_salary).toLocaleString()}</TableCell>
+                        <TableCell className="hidden md:table-cell">{(emp as any).branches?.name || "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-0.5">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewEmployee(emp)} title="View">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <EmployeeIDCard
+                              employee={{ ...emp, employment_status: empStatus, employee_id: (emp as any).employee_id }}
+                              branchName={(emp as any).branches?.name || "Station"}
+                            />
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEdit(emp)}>
+                                  <Edit2 className="h-4 w-4 mr-2" /> Edit
+                                </DropdownMenuItem>
+                                {STATUS_OPTIONS.filter(s => s !== empStatus).map(s => (
+                                  <DropdownMenuItem key={s} onClick={() => statusMutation.mutate({ id: emp.id, status: s })} className="capitalize">
+                                    Set {s}
+                                  </DropdownMenuItem>
+                                ))}
+                                {isAdmin && (
+                                  <DropdownMenuItem className="text-destructive" onClick={() => {
+                                    if (confirm("Delete this employee permanently?")) deleteMutation.mutate(emp.id);
+                                  }}>
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
