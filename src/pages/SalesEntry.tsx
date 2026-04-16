@@ -16,15 +16,15 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Save, Trash2, Receipt, Calculator, Download } from "lucide-react";
+import { Save, Receipt, Calculator, Download, User } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
-interface SalesRow {
+const MAX_PUMPS_PER_ATTENDANT = 4;
+
+interface PumpEntry {
   key: string;
-  attendant_id: string;
-  island_id: string;
   pump_id: string;
   opening_meter: string;
   closing_meter: string;
@@ -32,24 +32,14 @@ interface SalesRow {
   unit_price_usd: string;
 }
 
-const emptyRow = (): SalesRow => ({
-  key: crypto.randomUUID(),
-  attendant_id: "",
-  island_id: "",
-  pump_id: "",
-  opening_meter: "",
-  closing_meter: "",
-  rtt_usg: "0",
-  unit_price_usd: "",
-});
-
 export default function SalesEntry() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [rows, setRows] = useState<SalesRow[]>([emptyRow()]);
   const { selectedBranch: globalBranch, setSelectedBranch: setGlobalBranch, isBranchDisabled } = useBranchSelect();
   const { shifts, selectedShift: globalShift, setSelectedShift: setGlobalShift } = useShiftSelect();
+  const [selectedAttendant, setSelectedAttendant] = useState("");
+  const [pumpEntries, setPumpEntries] = useState<PumpEntry[]>([]);
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
@@ -60,21 +50,17 @@ export default function SalesEntry() {
     },
   });
 
+  // Fetch attendants with employee details (phone, employee_id)
   const { data: attendants } = useQuery({
-    queryKey: ["attendants", globalBranch],
+    queryKey: ["attendants-with-emp", globalBranch],
     enabled: !!globalBranch,
     queryFn: async () => {
-      const { data, error } = await supabase.from("attendants").select("id, full_name, employee_id").eq("branch_id", globalBranch).eq("is_active", true).order("full_name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: islands } = useQuery({
-    queryKey: ["islands", globalBranch],
-    enabled: !!globalBranch,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("islands").select("id, island_number").eq("branch_id", globalBranch).eq("is_active", true).order("island_number");
+      const { data, error } = await supabase
+        .from("attendants")
+        .select("id, full_name, employee_id, phone")
+        .eq("branch_id", globalBranch!)
+        .eq("is_active", true)
+        .order("full_name");
       if (error) throw error;
       return data;
     },
@@ -84,9 +70,25 @@ export default function SalesEntry() {
     queryKey: ["pumps", globalBranch],
     enabled: !!globalBranch,
     queryFn: async () => {
-      const { data, error } = await supabase.from("pumps").select("id, name, product_type, island_id").eq("branch_id", globalBranch).eq("is_active", true).order("name");
+      const { data, error } = await supabase.from("pumps").select("id, name, product_type, island_id").eq("branch_id", globalBranch!).eq("is_active", true).order("name");
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Get pumps already assigned (have sales entries) for this date+shift+branch
+  const { data: assignedPumps } = useQuery({
+    queryKey: ["assigned-pumps", date, globalBranch, globalShift],
+    enabled: !!globalBranch && !!globalShift,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shift_sales_reports")
+        .select("pump_id, attendant_id")
+        .eq("date", date)
+        .eq("branch_id", globalBranch!)
+        .eq("shift_id", globalShift);
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -98,7 +100,7 @@ export default function SalesEntry() {
         .from("shift_sales_reports")
         .select("*, attendants(full_name), pumps(name, product_type), islands(island_number)")
         .eq("date", date)
-        .eq("branch_id", globalBranch)
+        .eq("branch_id", globalBranch!)
         .eq("shift_id", globalShift)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -106,38 +108,63 @@ export default function SalesEntry() {
     },
   });
 
-  const submitMutation = useMutation({
-    mutationFn: async (entries: SalesRow[]) => {
-      const inserts = entries.map((r) => ({
-        branch_id: globalBranch,
-        shift_id: globalShift,
-        date,
-        attendant_id: r.attendant_id,
-        island_id: r.island_id || null,
-        pump_id: r.pump_id,
-        opening_meter: parseFloat(r.opening_meter) || 0,
-        closing_meter: parseFloat(r.closing_meter) || 0,
-        rtt_usg: parseFloat(r.rtt_usg) || 0,
-        unit_price_usd: parseFloat(r.unit_price_usd) || 0,
-        created_by: user?.id,
-      }));
-      const { error } = await supabase.from("shift_sales_reports").insert(inserts);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Sales entries submitted successfully");
-      setRows([emptyRow()]);
-      queryClient.invalidateQueries({ queryKey: ["sales-entries"] });
-    },
-    onError: (err: Error) => toast.error("Failed to submit: " + err.message),
-  });
+  const selectedAttendantData = useMemo(
+    () => attendants?.find(a => a.id === selectedAttendant),
+    [attendants, selectedAttendant]
+  );
 
-  const updateRow = (key: string, field: keyof SalesRow, value: string) => {
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
+  // Pumps already taken by OTHER attendants for this shift (or by this attendant already submitted)
+  const takenPumpIds = useMemo(() => {
+    const taken = new Set<string>();
+    assignedPumps?.forEach(ap => taken.add(ap.pump_id));
+    // Also exclude pumps already in current form entries
+    pumpEntries.forEach(pe => { if (pe.pump_id) taken.add(pe.pump_id); });
+    return taken;
+  }, [assignedPumps, pumpEntries]);
+
+  // Available pumps for dropdown: not taken by anyone in this shift
+  const getAvailablePumps = useCallback((currentPumpId: string) => {
+    return (pumps ?? []).filter(p => p.id === currentPumpId || !takenPumpIds.has(p.id));
+  }, [pumps, takenPumpIds]);
+
+  // Count how many pumps this attendant already has (submitted + current form)
+  const attendantPumpCount = useMemo(() => {
+    const submittedCount = assignedPumps?.filter(ap => ap.attendant_id === selectedAttendant).length ?? 0;
+    return submittedCount + pumpEntries.length;
+  }, [assignedPumps, selectedAttendant, pumpEntries]);
+
+  const canAddMorePumps = attendantPumpCount < MAX_PUMPS_PER_ATTENDANT;
+
+  // When attendant changes, reset pump entries
+  useEffect(() => {
+    setPumpEntries([]);
+  }, [selectedAttendant]);
+
+  const addPumpEntry = () => {
+    if (!canAddMorePumps) {
+      toast.error(`Max ${MAX_PUMPS_PER_ATTENDANT} pumps per attendant`);
+      return;
+    }
+    setPumpEntries(prev => [...prev, {
+      key: crypto.randomUUID(),
+      pump_id: "",
+      opening_meter: "",
+      closing_meter: "",
+      rtt_usg: "0",
+      unit_price_usd: "",
+    }]);
+  };
+
+  const updateEntry = (key: string, field: keyof PumpEntry, value: string) => {
+    setPumpEntries(prev => prev.map(e => e.key === key ? { ...e, [field]: value } : e));
+  };
+
+  const removeEntry = (key: string) => {
+    setPumpEntries(prev => prev.filter(e => e.key !== key));
   };
 
   const handlePumpSelect = useCallback(async (key: string, pumpId: string) => {
-    updateRow(key, "pump_id", pumpId);
+    updateEntry(key, "pump_id", pumpId);
     if (!pumpId || !date || !globalBranch || !globalShift) return;
     try {
       const { data: allShifts } = await supabase.from("shifts").select("id, start_time").order("start_time");
@@ -150,7 +177,7 @@ export default function SalesEntry() {
         const { data } = await supabase
           .from("shift_sales_reports")
           .select("closing_meter")
-          .eq("pump_id", pumpId).eq("date", date).eq("shift_id", prevShift.id).eq("branch_id", globalBranch)
+          .eq("pump_id", pumpId).eq("date", date).eq("shift_id", prevShift.id).eq("branch_id", globalBranch!)
           .order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (data) carryOverMeter = Number(data.closing_meter);
       }
@@ -159,47 +186,67 @@ export default function SalesEntry() {
         const { data } = await supabase
           .from("shift_sales_reports")
           .select("closing_meter")
-          .eq("pump_id", pumpId).eq("branch_id", globalBranch).lte("date", date)
+          .eq("pump_id", pumpId).eq("branch_id", globalBranch!).lte("date", date)
           .order("date", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (data) carryOverMeter = Number(data.closing_meter);
       }
 
       if (carryOverMeter !== null) {
-        updateRow(key, "opening_meter", carryOverMeter.toString());
+        updateEntry(key, "opening_meter", carryOverMeter.toString());
       }
     } catch (err) {
       console.error("Failed to fetch carry-over meter:", err);
     }
   }, [date, globalBranch, globalShift]);
 
-  const addRow = () => setRows((prev) => [...prev, emptyRow()]);
-  const removeRow = (key: string) => setRows((prev) => prev.length > 1 ? prev.filter((r) => r.key !== key) : prev);
-
-  const calcSales = (row: SalesRow) => {
-    const open = parseFloat(row.opening_meter) || 0;
-    const close = parseFloat(row.closing_meter) || 0;
-    const rtt = parseFloat(row.rtt_usg) || 0;
-    const price = parseFloat(row.unit_price_usd) || 0;
+  const calcSales = (entry: PumpEntry) => {
+    const open = parseFloat(entry.opening_meter) || 0;
+    const close = parseFloat(entry.closing_meter) || 0;
+    const rtt = parseFloat(entry.rtt_usg) || 0;
+    const price = parseFloat(entry.unit_price_usd) || 0;
     const salesUsg = close - open - rtt;
     const salesLiters = salesUsg * 3.78541;
     const totalUsd = salesUsg * price;
     return { salesUsg, salesLiters, totalUsd };
   };
 
-  const grandTotal = useMemo(() => rows.reduce((sum, r) => sum + calcSales(r).totalUsd, 0), [rows]);
+  const grandTotal = useMemo(() => pumpEntries.reduce((sum, e) => sum + calcSales(e).totalUsd, 0), [pumpEntries]);
 
-  const canSubmit = globalBranch && globalShift && rows.every(
-    (r) => r.attendant_id && r.pump_id && r.closing_meter && r.unit_price_usd &&
-      parseFloat(r.closing_meter) >= parseFloat(r.opening_meter || "0")
+  const canSubmit = globalBranch && globalShift && selectedAttendant && pumpEntries.length > 0 && pumpEntries.every(
+    e => e.pump_id && e.closing_meter && e.unit_price_usd &&
+      parseFloat(e.closing_meter) >= parseFloat(e.opening_meter || "0")
   );
 
-  const getPumpsForIsland = (islandId: string) => {
-    if (!islandId) return pumps ?? [];
-    return (pumps ?? []).filter((p) => p.island_id === islandId);
-  };
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const inserts = pumpEntries.map(e => ({
+        branch_id: globalBranch,
+        shift_id: globalShift,
+        date,
+        attendant_id: selectedAttendant,
+        pump_id: e.pump_id,
+        opening_meter: parseFloat(e.opening_meter) || 0,
+        closing_meter: parseFloat(e.closing_meter) || 0,
+        rtt_usg: parseFloat(e.rtt_usg) || 0,
+        unit_price_usd: parseFloat(e.unit_price_usd) || 0,
+        created_by: user?.id,
+      }));
+      const { error } = await supabase.from("shift_sales_reports").insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Sales entries submitted successfully");
+      setPumpEntries([]);
+      setSelectedAttendant("");
+      queryClient.invalidateQueries({ queryKey: ["sales-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["assigned-pumps"] });
+    },
+    onError: (err: Error) => toast.error("Failed to submit: " + err.message),
+  });
 
   return (
     <AppLayout title="Attendant Sales Entry" subtitle="Record pump meter readings and calculate sales per shift">
+      {/* Shift Details */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -207,27 +254,23 @@ export default function SalesEntry() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="space-y-2">
               <Label>Date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Station / Branch *</Label>
-              <Select value={globalBranch} onValueChange={(v) => { setGlobalBranch(v); setRows([emptyRow()]); }} disabled={isBranchDisabled}>
+              <Select value={globalBranch} onValueChange={v => { setGlobalBranch(v); setSelectedAttendant(""); setPumpEntries([]); }} disabled={isBranchDisabled}>
                 <SelectTrigger className={isBranchDisabled ? "opacity-70" : ""}><SelectValue placeholder="Select branch" /></SelectTrigger>
-                <SelectContent>
-                  {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{branches?.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Shift *</Label>
-              <Select value={globalShift} onValueChange={setGlobalShift}>
+              <Select value={globalShift} onValueChange={v => { setGlobalShift(v); setSelectedAttendant(""); setPumpEntries([]); }}>
                 <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
-                <SelectContent>
-                  {shifts?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.start_time}–{s.end_time})</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{shifts?.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.start_time}–{s.end_time})</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
@@ -240,91 +283,146 @@ export default function SalesEntry() {
         </CardContent>
       </Card>
 
+      {/* Attendant Selection */}
       {globalBranch && globalShift && (
         <Card className="mb-6">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Calculator className="h-5 w-5 text-primary" /> Meter Readings
-              </CardTitle>
-              <Button onClick={addRow} size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Add Row</Button>
-            </div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <User className="h-5 w-5 text-primary" /> Select Attendant
+            </CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto -mx-6 px-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[120px]">Attendant *</TableHead>
-                  <TableHead className="min-w-[90px]">Island</TableHead>
-                  <TableHead className="min-w-[100px]">Pump *</TableHead>
-                  <TableHead className="min-w-[100px]">Open Meter</TableHead>
-                  <TableHead className="min-w-[100px]">Close Meter *</TableHead>
-                  <TableHead className="min-w-[80px]">RTT</TableHead>
-                  <TableHead className="min-w-[80px]">Sales USG</TableHead>
-                  <TableHead className="min-w-[80px]">Sales L</TableHead>
-                  <TableHead className="min-w-[80px]">Price *</TableHead>
-                  <TableHead className="min-w-[90px]">Total $</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => {
-                  const { salesUsg, salesLiters, totalUsd } = calcSales(row);
-                  const availPumps = getPumpsForIsland(row.island_id);
-                  const selectedPump = pumps?.find((p) => p.id === row.pump_id);
-                  return (
-                    <TableRow key={row.key}>
-                      <TableCell>
-                        <Select value={row.attendant_id} onValueChange={(v) => updateRow(row.key, "attendant_id", v)}>
-                          <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>{attendants?.map((a) => <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select value={row.island_id} onValueChange={(v) => { updateRow(row.key, "island_id", v); updateRow(row.key, "pump_id", ""); }}>
-                          <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Any" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all_islands">All</SelectItem>
-                            {islands?.map((i) => <SelectItem key={i.id} value={i.id}>Island {i.island_number}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select value={row.pump_id} onValueChange={(v) => handlePumpSelect(row.key, v)}>
-                          <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>{availPumps.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                        {selectedPump && (
-                          <Badge variant="outline" className={cn("mt-1 text-[10px]", selectedPump.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>{selectedPump.product_type}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.opening_meter} onChange={(e) => updateRow(row.key, "opening_meter", e.target.value)} placeholder="0.00" /></TableCell>
-                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.closing_meter} onChange={(e) => updateRow(row.key, "closing_meter", e.target.value)} placeholder="0.00" /></TableCell>
-                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.rtt_usg} onChange={(e) => updateRow(row.key, "rtt_usg", e.target.value)} placeholder="0" /></TableCell>
-                      <TableCell><span className={cn("font-semibold text-xs", salesUsg < 0 ? "text-destructive" : "")}>{salesUsg.toFixed(2)}</span></TableCell>
-                      <TableCell><span className="text-xs text-muted-foreground">{salesLiters.toFixed(2)}</span></TableCell>
-                      <TableCell><Input type="number" min="0" step="0.01" className="h-9 text-xs" value={row.unit_price_usd} onChange={(e) => updateRow(row.key, "unit_price_usd", e.target.value)} placeholder="$0.00" /></TableCell>
-                      <TableCell><span className="font-bold text-xs text-primary">${totalUsd.toFixed(2)}</span></TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeRow(row.key)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <div className="mt-4 flex items-center justify-between">
-              <Button onClick={addRow} variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" /> Add Row</Button>
-              <Button onClick={() => { if (canSubmit) submitMutation.mutate(rows); else toast.error("Fill all required fields"); }} disabled={!canSubmit || submitMutation.isPending} size="sm">
-                <Save className="h-4 w-4 mr-2" /> {submitMutation.isPending ? "Submitting..." : "Submit Entries"}
-              </Button>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Attendant Name *</Label>
+                <Select value={selectedAttendant} onValueChange={setSelectedAttendant}>
+                  <SelectTrigger><SelectValue placeholder="Select attendant" /></SelectTrigger>
+                  <SelectContent>
+                    {attendants?.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedAttendantData && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Employee ID</Label>
+                    <Input value={selectedAttendantData.employee_id || "—"} readOnly className="bg-muted" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input value={selectedAttendantData.phone || "—"} readOnly className="bg-muted" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Pumps Assigned</Label>
+                    <div className="h-10 flex items-center px-3 rounded-md bg-muted border">
+                      <span className="font-medium">{attendantPumpCount} / {MAX_PUMPS_PER_ATTENDANT}</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* Meter Readings */}
+      {globalBranch && globalShift && selectedAttendant && (
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calculator className="h-5 w-5 text-primary" /> Meter Readings — {selectedAttendantData?.full_name}
+              </CardTitle>
+              <Button onClick={addPumpEntry} size="sm" variant="outline" disabled={!canAddMorePumps}>
+                + Assign Pump ({pumpEntries.length}/{MAX_PUMPS_PER_ATTENDANT - (assignedPumps?.filter(ap => ap.attendant_id === selectedAttendant).length ?? 0)})
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="overflow-x-auto -mx-6 px-6">
+            {pumpEntries.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Click "Assign Pump" to add pump meter readings for this attendant
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[120px]">Pump *</TableHead>
+                    <TableHead className="min-w-[80px]">Product</TableHead>
+                    <TableHead className="min-w-[100px]">Open Meter</TableHead>
+                    <TableHead className="min-w-[100px]">Close Meter *</TableHead>
+                    <TableHead className="min-w-[80px]">RTT</TableHead>
+                    <TableHead className="min-w-[80px]">Sales USG</TableHead>
+                    <TableHead className="min-w-[80px]">Sales L</TableHead>
+                    <TableHead className="min-w-[80px]">Price *</TableHead>
+                    <TableHead className="min-w-[90px]">Total $</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pumpEntries.map(entry => {
+                    const { salesUsg, salesLiters, totalUsd } = calcSales(entry);
+                    const availPumps = getAvailablePumps(entry.pump_id);
+                    const selectedPump = pumps?.find(p => p.id === entry.pump_id);
+                    return (
+                      <TableRow key={entry.key}>
+                        <TableCell>
+                          <Select value={entry.pump_id} onValueChange={v => handlePumpSelect(entry.key, v)}>
+                            <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select pump" /></SelectTrigger>
+                            <SelectContent>
+                              {availPumps.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          {selectedPump && (
+                            <Badge variant="outline" className={cn("text-[10px]", selectedPump.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
+                              {selectedPump.product_type}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={entry.opening_meter} onChange={e => updateEntry(entry.key, "opening_meter", e.target.value)} placeholder="0.00" />
+                        </TableCell>
+                        <TableCell>
+                          <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={entry.closing_meter} onChange={e => updateEntry(entry.key, "closing_meter", e.target.value)} placeholder="0.00" />
+                        </TableCell>
+                        <TableCell>
+                          <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={entry.rtt_usg} onChange={e => updateEntry(entry.key, "rtt_usg", e.target.value)} placeholder="0" />
+                        </TableCell>
+                        <TableCell><span className={cn("font-semibold text-xs", salesUsg < 0 ? "text-destructive" : "")}>{salesUsg.toFixed(2)}</span></TableCell>
+                        <TableCell><span className="text-xs text-muted-foreground">{salesLiters.toFixed(2)}</span></TableCell>
+                        <TableCell>
+                          <Input type="number" min="0" step="0.01" className="h-9 text-xs" value={entry.unit_price_usd} onChange={e => updateEntry(entry.key, "unit_price_usd", e.target.value)} placeholder="$0.00" />
+                        </TableCell>
+                        <TableCell><span className="font-bold text-xs text-primary">${totalUsd.toFixed(2)}</span></TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeEntry(entry.key)}>
+                            ✕
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+            {pumpEntries.length > 0 && (
+              <div className="mt-4 flex justify-end">
+                <Button onClick={() => { if (canSubmit) submitMutation.mutate(); else toast.error("Fill all required fields"); }} disabled={!canSubmit || submitMutation.isPending} size="sm">
+                  <Save className="h-4 w-4 mr-2" /> {submitMutation.isPending ? "Submitting..." : "Submit Entries"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Submitted entries */}
       {globalBranch && globalShift && todaysEntries && todaysEntries.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -352,7 +450,7 @@ export default function SalesEntry() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {todaysEntries.map((e) => (
+                {todaysEntries.map(e => (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{(e.attendants as any)?.full_name}</TableCell>
                     <TableCell>{(e.pumps as any)?.name}</TableCell>
