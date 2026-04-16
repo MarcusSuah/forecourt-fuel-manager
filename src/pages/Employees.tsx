@@ -34,7 +34,7 @@ export default function Employees() {
 
   const [form, setForm] = useState({
     full_name: "", position: "", date_of_birth: "", employment_date: "",
-    gender: "", gross_salary: "", social_security_number: "",
+    gender: "", gross_salary: "", social_security_number: "", phone: "",
   });
 
   const { data: employees, isLoading } = useQuery({
@@ -67,7 +67,7 @@ export default function Employees() {
       toast.success("Employee added");
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       setOpen(false);
-      setForm({ full_name: "", position: "", date_of_birth: "", employment_date: "", gender: "", gross_salary: "", social_security_number: "" });
+      setForm({ full_name: "", position: "", date_of_birth: "", employment_date: "", gender: "", gross_salary: "", social_security_number: "", phone: "" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -82,6 +82,7 @@ export default function Employees() {
       employment_date: form.employment_date || new Date().toISOString().split("T")[0],
       gender: form.gender || null, gross_salary: parseFloat(form.gross_salary) || 0,
       social_security_number: form.social_security_number || null,
+      phone: form.phone || null,
       branch_id: formBranch || null,
     });
   };
@@ -150,6 +151,8 @@ export default function Employees() {
                         <SelectItem value="Supervisor">Supervisor</SelectItem>
                         <SelectItem value="Cashier">Cashier</SelectItem>
                         <SelectItem value="Pump Attendant">Pump Attendant</SelectItem>
+                        <SelectItem value="Mechanic">Mechanic</SelectItem>
+                        <SelectItem value="Shop Attendant">Shop Attendant</SelectItem>
                         <SelectItem value="Security">Security</SelectItem>
                         <SelectItem value="Driver">Driver</SelectItem>
                         <SelectItem value="Cleaner">Cleaner</SelectItem>
@@ -182,9 +185,15 @@ export default function Employees() {
                       <Input type="number" value={form.gross_salary} onChange={e => setForm(f => ({ ...f, gross_salary: e.target.value }))} />
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label>Social Security Number</Label>
-                    <Input value={form.social_security_number} onChange={e => setForm(f => ({ ...f, social_security_number: e.target.value }))} placeholder="Unique SSN" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Social Security Number</Label>
+                      <Input value={form.social_security_number} onChange={e => setForm(f => ({ ...f, social_security_number: e.target.value }))} placeholder="Unique SSN" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Phone</Label>
+                      <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone number" />
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label>Branch</Label>
@@ -215,27 +224,29 @@ export default function Employees() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead className="hidden md:table-cell">Gender</TableHead>
-                    <TableHead className="hidden md:table-cell">Age</TableHead>
-                    <TableHead className="hidden lg:table-cell">Employment Date</TableHead>
-                    <TableHead className="hidden lg:table-cell">Years of Service</TableHead>
-                    <TableHead>Gross Salary</TableHead>
-                    <TableHead className="hidden xl:table-cell">SSN</TableHead>
-                    <TableHead className="hidden md:table-cell">Branch</TableHead>
-                  </TableRow>
+                     <TableHead>Full Name</TableHead>
+                     <TableHead>Position</TableHead>
+                     <TableHead className="hidden md:table-cell">Phone</TableHead>
+                     <TableHead className="hidden md:table-cell">Gender</TableHead>
+                     <TableHead className="hidden md:table-cell">Age</TableHead>
+                     <TableHead className="hidden lg:table-cell">Employment Date</TableHead>
+                     <TableHead className="hidden lg:table-cell">Years of Service</TableHead>
+                     <TableHead>Gross Salary</TableHead>
+                     <TableHead className="hidden xl:table-cell">SSN</TableHead>
+                     <TableHead className="hidden md:table-cell">Branch</TableHead>
+                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
                   ) : !filtered?.length ? (
-                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No employees found</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No employees found</TableCell></TableRow>
                   ) : filtered.map(emp => (
                     <TableRow key={emp.id}>
                       <TableCell className="font-medium">{emp.full_name}</TableCell>
-                      <TableCell><Badge variant="outline">{emp.position}</Badge></TableCell>
-                      <TableCell className="hidden md:table-cell">{emp.gender || "—"}</TableCell>
+                       <TableCell><Badge variant="outline">{emp.position}</Badge></TableCell>
+                       <TableCell className="hidden md:table-cell">{(emp as any).phone || "—"}</TableCell>
+                       <TableCell className="hidden md:table-cell">{emp.gender || "—"}</TableCell>
                       <TableCell className="hidden md:table-cell">{getAge(emp.date_of_birth)}</TableCell>
                       <TableCell className="hidden lg:table-cell">{format(new Date(emp.employment_date), "MMM dd, yyyy")}</TableCell>
                       <TableCell className="hidden lg:table-cell">{getYearsOfService(emp.employment_date)} yrs</TableCell>
