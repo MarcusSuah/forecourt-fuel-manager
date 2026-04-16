@@ -1,6 +1,7 @@
-import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Printer, User } from "lucide-react";
+import { Printer } from "lucide-react";
+import QRCode from "qrcode";
+import { useCallback } from "react";
 
 interface EmployeeIDCardProps {
   employee: {
@@ -16,9 +17,25 @@ interface EmployeeIDCardProps {
 }
 
 export function EmployeeIDCard({ employee, branchName }: EmployeeIDCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useCallback(async () => {
+    const qrData = JSON.stringify({
+      name: employee.full_name,
+      id: employee.employee_id || "N/A",
+      position: employee.position,
+      branch: branchName,
+    });
 
-  const handlePrint = () => {
+    let qrDataUrl = "";
+    try {
+      qrDataUrl = await QRCode.toDataURL(qrData, {
+        width: 80,
+        margin: 1,
+        color: { dark: "#ffffff", light: "#00000000" },
+      });
+    } catch {
+      console.error("QR generation failed");
+    }
+
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       alert("Please allow popups to print ID Card");
@@ -29,6 +46,10 @@ export function EmployeeIDCard({ employee, branchName }: EmployeeIDCardProps) {
       ? `<img src="${employee.photo_url}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #1e40af;" />`
       : `<div style="width:90px;height:90px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;border:3px solid #1e40af;font-size:36px;color:#94a3b8;">👤</div>`;
 
+    const qrHTML = qrDataUrl
+      ? `<img src="${qrDataUrl}" style="width:70px;height:70px;position:absolute;right:10px;bottom:28px;border-radius:4px;" />`
+      : "";
+
     printWindow.document.write(`<!DOCTYPE html><html><head><title>ID Card - ${employee.full_name}</title>
       <style>
         @media print { body { margin:0; } .no-print { display:none; } @page { size: 3.375in 2.125in; margin:0; } }
@@ -36,7 +57,6 @@ export function EmployeeIDCard({ employee, branchName }: EmployeeIDCardProps) {
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; background:#f1f5f9; }
       </style></head><body>
       <div style="width:3.375in;height:2.125in;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:12px;overflow:hidden;color:white;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-        <!-- Header -->
         <div style="background:rgba(255,255,255,0.1);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">⛽ ${branchName}</div>
@@ -44,7 +64,6 @@ export function EmployeeIDCard({ employee, branchName }: EmployeeIDCardProps) {
           </div>
           <div style="font-size:7px;background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:4px;">FMS</div>
         </div>
-        <!-- Body -->
         <div style="display:flex;padding:10px 14px;gap:12px;align-items:center;">
           ${photoHTML}
           <div style="flex:1;">
@@ -57,7 +76,7 @@ export function EmployeeIDCard({ employee, branchName }: EmployeeIDCardProps) {
             </div>
           </div>
         </div>
-        <!-- Footer -->
+        ${qrHTML}
         <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,0.08);padding:4px 14px;display:flex;justify-content:space-between;font-size:7px;color:rgba(255,255,255,0.5);">
           <span>Forecourt Management System</span>
           <span>Valid while employed</span>
@@ -66,7 +85,7 @@ export function EmployeeIDCard({ employee, branchName }: EmployeeIDCardProps) {
       <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:10px 24px;background:#1e40af;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Print ID Card</button>
     </body></html>`);
     printWindow.document.close();
-  };
+  }, [employee, branchName]);
 
   return (
     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrint} title="Print ID Card">
