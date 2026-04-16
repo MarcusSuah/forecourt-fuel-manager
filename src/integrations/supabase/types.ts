@@ -327,6 +327,7 @@ export type Database = {
           created_at: string
           date_of_birth: string | null
           employment_date: string
+          employment_status: string
           full_name: string
           gender: string | null
           gross_salary: number
@@ -343,6 +344,7 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           employment_date?: string
+          employment_status?: string
           full_name: string
           gender?: string | null
           gross_salary?: number
@@ -359,6 +361,7 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           employment_date?: string
+          employment_status?: string
           full_name?: string
           gender?: string | null
           gross_salary?: number

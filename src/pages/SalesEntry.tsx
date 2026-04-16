@@ -50,19 +50,26 @@ export default function SalesEntry() {
     },
   });
 
-  // Fetch attendants with employee details (phone, employee_id)
+  // Fetch attendants — exclude those linked to inactive employees
   const { data: attendants } = useQuery({
     queryKey: ["attendants-with-emp", globalBranch],
     enabled: !!globalBranch,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: atts, error } = await supabase
         .from("attendants")
-        .select("id, full_name, employee_id, phone")
+        .select("id, full_name, employee_id, phone, user_id")
         .eq("branch_id", globalBranch!)
         .eq("is_active", true)
         .order("full_name");
       if (error) throw error;
-      return data;
+      // Fetch employees with non-active status for this branch to exclude them
+      const { data: inactiveEmps } = await supabase
+        .from("employees")
+        .select("full_name")
+        .eq("branch_id", globalBranch!)
+        .neq("employment_status", "active");
+      const inactiveNames = new Set((inactiveEmps ?? []).map(e => e.full_name.toLowerCase()));
+      return (atts ?? []).filter(a => !inactiveNames.has(a.full_name.toLowerCase()));
     },
   });
 
