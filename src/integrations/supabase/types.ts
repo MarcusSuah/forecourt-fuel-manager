@@ -332,6 +332,7 @@ export type Database = {
           gross_salary: number
           id: string
           is_active: boolean
+          phone: string | null
           photo_url: string | null
           position: string
           social_security_number: string | null
@@ -347,6 +348,7 @@ export type Database = {
           gross_salary?: number
           id?: string
           is_active?: boolean
+          phone?: string | null
           photo_url?: string | null
           position: string
           social_security_number?: string | null
@@ -362,6 +364,7 @@ export type Database = {
           gross_salary?: number
           id?: string
           is_active?: boolean
+          phone?: string | null
           photo_url?: string | null
           position?: string
           social_security_number?: string | null
