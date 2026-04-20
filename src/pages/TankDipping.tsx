@@ -18,6 +18,8 @@ import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Set
 import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
 import { Link } from "react-router-dom";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 // Tiny inline sparkline. Negative values are red, non-negative blue.
 function Sparkline({ values, width = 80, height = 24 }: { values: number[]; width?: number; height?: number }) {

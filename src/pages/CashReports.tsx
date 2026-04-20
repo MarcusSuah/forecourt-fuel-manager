@@ -20,6 +20,8 @@ import { Plus, Save, Trash2, Wallet, DollarSign, Banknote, Download } from "luci
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
 import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -154,6 +156,15 @@ export default function CashReports() {
   }, [todaysDeposits]);
 
   const canSubmit = globalBranch && globalShift && rows.every(r => r.deposit_type && r.amount && parseFloat(r.amount) > 0);
+
+  // Any row has user-entered data that hasn't been submitted yet
+  const hasUnsavedChanges = rows.some(
+    (r) => r.attendant_id || r.deposit_type || r.amount || r.notes,
+  );
+  const { dialogProps: unsavedDialogProps } = useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have unsubmitted cash deposits. Leave this page and discard them?",
+  );
 
   return (
     <AppLayout title="Cash Reports" subtitle="Record daily cash deposits and reconcile by shift">
@@ -338,6 +349,7 @@ export default function CashReports() {
           </CardContent>
         </Card>
       )}
+      <UnsavedChangesDialog {...unsavedDialogProps} />
     </AppLayout>
   );
 }
