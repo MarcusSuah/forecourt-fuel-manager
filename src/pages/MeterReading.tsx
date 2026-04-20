@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
@@ -41,16 +41,38 @@ export default function MeterReading() {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [attendantSel, setAttendantSel] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
-    enabled: !isDealer,
     queryFn: async () => {
-      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("branches")
+        .select("id, name, county, location")
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ["system-prefs-meter"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "system_preferences")
+        .maybeSingle();
+      if (error) throw error;
+      return data?.value as { company_name?: string } | null;
     },
   });
 
@@ -167,6 +189,20 @@ export default function MeterReading() {
     return branchAttendants ?? [];
   };
 
+  const isRowSaved = (pumpId: string) => {
+    const ex = existingReadings?.find((r) => r.pump_id === pumpId);
+    if (!ex) return false;
+    const eq = (a: any, b: any) =>
+      a === undefined || a === null || Number(a) === Number(b);
+    return (
+      eq(openings[pumpId], ex.opening_meter) &&
+      eq(meters[pumpId], ex.closing_meter) &&
+      eq(rtts[pumpId], ex.rtt_usg) &&
+      eq(prices[pumpId], ex.unit_price_usd) &&
+      (attendantSel[pumpId] === undefined || attendantSel[pumpId] === ex.attendant_id)
+    );
+  };
+
   // Compute current bad-row pump names (volume <= 0 from inputs or persisted readings).
   const getBadPumps = (): string[] => {
     const bad: string[] = [];
@@ -191,6 +227,7 @@ export default function MeterReading() {
   };
 
   const lastSavedAt = (() => {
+    void nowTick; // re-evaluate every minute
     if (!existingReadings || existingReadings.length === 0) return null;
     const max = existingReadings.reduce((acc, r: any) => {
       const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
@@ -198,6 +235,17 @@ export default function MeterReading() {
     }, 0);
     return max ? new Date(max) : null;
   })();
+
+  const formatRelative = (d: Date) => {
+    const diff = Math.max(0, Date.now() - d.getTime());
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "just now";
+    if (min < 60) return `${min} min ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} hr ago`;
+    const day = Math.floor(hr / 24);
+    return `${day} day${day === 1 ? "" : "s"} ago`;
+  };
 
   const buildExportRows = () => {
     const rows: (string | number)[][] = [];
@@ -322,7 +370,7 @@ export default function MeterReading() {
               </Button>
               {lastSavedAt && (
                 <span className="text-xs text-muted-foreground">
-                  Last saved at {format(lastSavedAt, "HH:mm")}
+                  Last saved {formatRelative(lastSavedAt)}
                 </span>
               )}
               <Button
@@ -371,11 +419,14 @@ export default function MeterReading() {
                   stringRows.push(["AGO Subtotal", "", "", "", "", "", "", agoV.toLocaleString(), `$${agoS.toFixed(2)}`]);
                   stringRows.push(["Shift Total", "", "", "", "", "", "", tV.toLocaleString(), `$${tS.toFixed(2)}`]);
                   const shiftName = shifts?.find((s) => s.id === selectedShift)?.name ?? "";
-                  const branchName =
-                    branches?.find((b) => b.id === branchId)?.name ?? "";
+                  const branchRecord = branches?.find((b) => b.id === branchId);
+                  const branchName = branchRecord?.name ?? "";
+                  const branchAddress = [branchRecord?.location, branchRecord?.county]
+                    .filter(Boolean)
+                    .join(", ");
                   exportTableToPDF(
                     "Meter Readings Report",
-                    `${branchName ? branchName + " • " : ""}${shiftName} Shift • ${selectedDate}`,
+                    `${shiftName} Shift • ${selectedDate}`,
                     headers,
                     stringRows,
                     [
@@ -384,6 +435,11 @@ export default function MeterReading() {
                       { label: "PMS Volume", value: `${pmsV.toLocaleString()} USG` },
                       { label: "AGO Volume", value: `${agoV.toLocaleString()} USG` },
                     ],
+                    {
+                      companyName: companySettings?.company_name || "Forecourt Management System",
+                      branchName,
+                      branchAddress,
+                    },
                   );
                 }}
               >
@@ -449,6 +505,14 @@ export default function MeterReading() {
                         <div className="flex items-center gap-2">
                           {isBad && <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />}
                           {pump.name}
+                          {isRowSaved(pump.id) && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] border-success/40 text-success px-1.5 py-0"
+                            >
+                              Saved
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>

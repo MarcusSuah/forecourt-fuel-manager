@@ -1,16 +1,43 @@
 // Simple client-side PDF generation using a printable HTML approach
+export interface PDFHeaderInfo {
+  companyName?: string;
+  branchName?: string;
+  branchAddress?: string;
+  logoUrl?: string;
+}
+
 export function exportTableToPDF(
   title: string,
   subtitle: string,
   headers: string[],
   rows: string[][],
-  summaryCards?: { label: string; value: string }[]
+  summaryCards?: { label: string; value: string }[],
+  headerInfo?: PDFHeaderInfo,
 ) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     alert("Please allow popups to export PDF");
     return;
   }
+
+  const officialHeaderHTML = headerInfo
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:16px;border-bottom:3px solid #1e40af;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:14px">
+          ${headerInfo.logoUrl
+            ? `<img src="${headerInfo.logoUrl}" style="width:56px;height:56px;object-fit:contain" />`
+            : `<div style="width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#1e40af,#0f172a);color:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700">⛽</div>`}
+          <div>
+            <div style="font-size:18px;font-weight:700;color:#0f172a;letter-spacing:0.3px">${headerInfo.companyName ?? ""}</div>
+            ${headerInfo.branchName ? `<div style="font-size:12px;color:#334155;font-weight:600">${headerInfo.branchName}</div>` : ""}
+            ${headerInfo.branchAddress ? `<div style="font-size:11px;color:#64748b">${headerInfo.branchAddress}</div>` : ""}
+          </div>
+        </div>
+        <div style="text-align:right;font-size:10px;color:#64748b">
+          <div style="font-weight:600;color:#1e40af;letter-spacing:1px;text-transform:uppercase">Official Report</div>
+          <div style="margin-top:2px">${new Date().toLocaleDateString()}</div>
+        </div>
+      </div>`
+    : "";
 
   const summaryHTML = summaryCards?.length
     ? `<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
@@ -52,6 +79,7 @@ export function exportTableToPDF(
       </style>
     </head>
     <body>
+      ${officialHeaderHTML}
       <div style="margin-bottom:24px">
         <h1 style="font-size:22px;font-weight:700;margin:0 0 4px">${title}</h1>
         <p style="font-size:13px;color:#64748b;margin:0">${subtitle}</p>
