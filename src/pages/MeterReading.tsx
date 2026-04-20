@@ -16,6 +16,17 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function MeterReading() {
   const { isDealer, dealerBranchId } = useDealerBranch();
@@ -29,6 +40,7 @@ export default function MeterReading() {
   const [rtts, setRtts] = useState<Record<string, number>>({});
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [attendantSel, setAttendantSel] = useState<Record<string, string>>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -128,7 +140,7 @@ export default function MeterReading() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id, unit_price_usd")
+        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id, unit_price_usd, updated_at")
         .eq("branch_id", branchId!)
         .eq("shift_id", selectedShift)
         .eq("date", selectedDate);
@@ -153,6 +165,66 @@ export default function MeterReading() {
       .map((a: any) => ({ id: a.attendants.id, full_name: a.attendants.full_name }));
     if (assigned.length > 0) return assigned;
     return branchAttendants ?? [];
+  };
+
+  // Compute current bad-row pump names (volume <= 0 from inputs or persisted readings).
+  const getBadPumps = (): string[] => {
+    const bad: string[] = [];
+    (pumps ?? []).forEach((pump) => {
+      const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+      const closingRaw = meters[pump.id] ?? ex?.closing_meter;
+      if (closingRaw === undefined || closingRaw === null) return;
+      const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
+      const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
+      const volume = Number(closingRaw) - Number(opening) - Number(rtt);
+      if (volume <= 0) bad.push(pump.name);
+    });
+    return bad;
+  };
+
+  const handleSaveClick = () => {
+    if (getBadPumps().length > 0) {
+      setConfirmOpen(true);
+    } else {
+      saveMutation.mutate();
+    }
+  };
+
+  const lastSavedAt = (() => {
+    if (!existingReadings || existingReadings.length === 0) return null;
+    const max = existingReadings.reduce((acc, r: any) => {
+      const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+      return t > acc ? t : acc;
+    }, 0);
+    return max ? new Date(max) : null;
+  })();
+
+  const buildExportRows = () => {
+    const rows: (string | number)[][] = [];
+    let tV = 0, tS = 0, pmsV = 0, pmsS = 0, agoV = 0, agoS = 0;
+    (pumps ?? []).forEach((pump) => {
+      const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+      const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
+      const closingRaw = meters[pump.id] ?? ex?.closing_meter;
+      const closing = closingRaw ?? "";
+      const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
+      const price = prices[pump.id] ?? ex?.unit_price_usd ?? getPrevPrice(pump.id);
+      const aId = attendantSel[pump.id] ?? ex?.attendant_id ?? "";
+      const aName = (branchAttendants ?? []).find((a) => a.id === aId)?.full_name ?? "";
+      const volume = closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : 0;
+      const total = volume * Number(price);
+      if (volume > 0) {
+        tV += volume; tS += total;
+        if (pump.product_type === "PMS") { pmsV += volume; pmsS += total; }
+        else { agoV += volume; agoS += total; }
+      }
+      rows.push([
+        pump.name, pump.product_type, aName,
+        Number(opening), closing === "" ? "" : Number(closing),
+        Number(rtt), Number(price), volume, total.toFixed(2),
+      ]);
+    });
+    return { rows, tV, tS, pmsV, pmsS, agoV, agoS };
   };
 
   const saveMutation = useMutation({
@@ -242,12 +314,17 @@ export default function MeterReading() {
               </CardTitle>
               <Button
                 size="sm"
-                onClick={() => saveMutation.mutate()}
+                onClick={handleSaveClick}
                 disabled={saveMutation.isPending}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saveMutation.isPending ? "Saving..." : "Save Readings"}
               </Button>
+              {lastSavedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Last saved at {format(lastSavedAt, "HH:mm")}
+                </span>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -263,30 +340,7 @@ export default function MeterReading() {
                     "Volume (USG)",
                     "Total (USD)",
                   ];
-                  const rows: (string | number)[][] = [];
-                  let tV = 0, tS = 0, pmsV = 0, pmsS = 0, agoV = 0, agoS = 0;
-                  (pumps ?? []).forEach((pump) => {
-                    const ex = existingReadings?.find((r) => r.pump_id === pump.id);
-                    const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
-                    const closingRaw = meters[pump.id] ?? ex?.closing_meter;
-                    const closing = closingRaw ?? "";
-                    const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
-                    const price = prices[pump.id] ?? ex?.unit_price_usd ?? getPrevPrice(pump.id);
-                    const aId = attendantSel[pump.id] ?? ex?.attendant_id ?? "";
-                    const aName = (branchAttendants ?? []).find((a) => a.id === aId)?.full_name ?? "";
-                    const volume = closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : 0;
-                    const total = volume * Number(price);
-                    if (volume > 0) {
-                      tV += volume; tS += total;
-                      if (pump.product_type === "PMS") { pmsV += volume; pmsS += total; }
-                      else { agoV += volume; agoS += total; }
-                    }
-                    rows.push([
-                      pump.name, pump.product_type, aName,
-                      Number(opening), closing === "" ? "" : Number(closing),
-                      Number(rtt), Number(price), volume, total.toFixed(2),
-                    ]);
-                  });
+                  const { rows, tV, tS, pmsV, pmsS, agoV, agoS } = buildExportRows();
                   rows.push(["PMS Subtotal", "", "", "", "", "", "", pmsV, pmsS.toFixed(2)]);
                   rows.push(["AGO Subtotal", "", "", "", "", "", "", agoV, agoS.toFixed(2)]);
                   rows.push(["Shift Total", "", "", "", "", "", "", tV, tS.toFixed(2)]);
@@ -299,6 +353,42 @@ export default function MeterReading() {
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const headers = [
+                    "Pump", "Product", "Attendant",
+                    "Opening", "Closing", "RTT (USG)",
+                    "Price (USD)", "Volume (USG)", "Total (USD)",
+                  ];
+                  const { rows, tV, tS, pmsV, pmsS, agoV, agoS } = buildExportRows();
+                  const stringRows = rows.map((r) =>
+                    r.map((c) => (typeof c === "number" ? c.toLocaleString() : String(c))),
+                  );
+                  stringRows.push(["PMS Subtotal", "", "", "", "", "", "", pmsV.toLocaleString(), `$${pmsS.toFixed(2)}`]);
+                  stringRows.push(["AGO Subtotal", "", "", "", "", "", "", agoV.toLocaleString(), `$${agoS.toFixed(2)}`]);
+                  stringRows.push(["Shift Total", "", "", "", "", "", "", tV.toLocaleString(), `$${tS.toFixed(2)}`]);
+                  const shiftName = shifts?.find((s) => s.id === selectedShift)?.name ?? "";
+                  const branchName =
+                    branches?.find((b) => b.id === branchId)?.name ?? "";
+                  exportTableToPDF(
+                    "Meter Readings Report",
+                    `${branchName ? branchName + " • " : ""}${shiftName} Shift • ${selectedDate}`,
+                    headers,
+                    stringRows,
+                    [
+                      { label: "Total Volume", value: `${tV.toLocaleString()} USG` },
+                      { label: "Total Sales", value: `$${tS.toFixed(2)}` },
+                      { label: "PMS Volume", value: `${pmsV.toLocaleString()} USG` },
+                      { label: "AGO Volume", value: `${agoV.toLocaleString()} USG` },
+                    ],
+                  );
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export PDF
               </Button>
             </div>
           </CardHeader>
@@ -511,6 +601,35 @@ export default function MeterReading() {
           </CardContent>
         </Card>
       )}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Bad meter readings detected
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The following pumps have a volume of zero or negative, which usually means
+              the closing meter, opening meter, or RTT was entered incorrectly:
+              <span className="mt-2 block font-medium text-foreground">
+                {getBadPumps().join(", ")}
+              </span>
+              Are you sure you want to save these readings anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Review again</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                saveMutation.mutate();
+              }}
+            >
+              Save anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
