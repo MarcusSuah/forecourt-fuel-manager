@@ -14,6 +14,8 @@ import { Printer, Download, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
+import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 
 export default function ShiftStockReport() {
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
@@ -27,7 +29,25 @@ export default function ShiftStockReport() {
     queryKey: ["branches"],
     enabled: !isDealer,
     queryFn: async () => {
-      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("branches")
+        .select("id, name, county, location")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: dealerBranchInfo } = useQuery({
+    queryKey: ["dealer-branch-info", dealerBranchId],
+    enabled: !!isDealer && !!dealerBranchId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("branches")
+        .select("id, name, county, location")
+        .eq("id", dealerBranchId!)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
