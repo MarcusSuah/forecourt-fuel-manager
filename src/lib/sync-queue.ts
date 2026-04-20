@@ -5,6 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
  * Records to insert are stored in localStorage and flushed when online.
  * Each entry retries up to MAX_RETRIES times; on the 3rd failure it moves to
  * the "failed" state and the user must Retry or Discard manually.
+ *
+ * Each entry is also mirrored to a shared `sync_queue` table in the database
+ * (best-effort) so that admins can monitor and act on queued entries from
+ * every user via the /admin/sync-queue page.
  */
 
 export type QueueEntryStatus = "pending" | "syncing" | "failed";
@@ -90,16 +94,21 @@ export function enqueue(input: {
     updatedAt: Date.now(),
   };
   write([...entries, entry]);
+  // Mirror to shared table for admin visibility (best-effort, non-blocking)
+  void mirrorToServer(entry);
   // Try to flush right away in case we're actually online
   void syncAll();
   return entry.id;
 }
 
 export function discard(id: string) {
+  void deleteMirror(id);
   write(read().filter((e) => e.id !== id));
 }
 
 export function discardAll() {
+  const all = read();
+  for (const e of all) void deleteMirror(e.id);
   write([]);
 }
 
@@ -109,6 +118,7 @@ export function retry(id: string) {
     e.id === id ? { ...e, status: "pending" as const, attempts: 0, lastError: undefined, updatedAt: Date.now() } : e,
   );
   write(entries);
+  void updateMirror(id, { status: "pending", attempts: 0, last_error: null });
   void syncAll();
 }
 
