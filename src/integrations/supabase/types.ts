@@ -864,6 +864,9 @@ export type Database = {
           notification_status: string | null
           notified_emails: string[] | null
           notified_phones: string[] | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
           severity: string
           stock_reading_id: string | null
           tank_id: string
@@ -878,6 +881,9 @@ export type Database = {
           notification_status?: string | null
           notified_emails?: string[] | null
           notified_phones?: string[] | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           severity?: string
           stock_reading_id?: string | null
           tank_id: string
@@ -892,6 +898,9 @@ export type Database = {
           notification_status?: string | null
           notified_emails?: string[] | null
           notified_phones?: string[] | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
           severity?: string
           stock_reading_id?: string | null
           tank_id?: string
