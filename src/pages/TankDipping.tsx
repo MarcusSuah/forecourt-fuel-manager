@@ -59,6 +59,13 @@ export default function TankDipping() {
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
+  // Unsaved-changes guard: any locally entered dip or opening that hasn't been persisted
+  const hasUnsavedChanges = Object.keys(dips).length > 0 || Object.keys(openings).length > 0;
+  const { dialogProps: unsavedDialogProps } = useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have unsaved tank dip readings. Leave this page and discard changes?",
+  );
+
   const { data: branches } = useQuery({
     queryKey: ["branches"],
     enabled: !isDealer,
@@ -646,6 +653,7 @@ export default function TankDipping() {
         </Card>
         </>
       )}
+      <UnsavedChangesDialog {...unsavedDialogProps} />
     </AppLayout>
   );
 }
