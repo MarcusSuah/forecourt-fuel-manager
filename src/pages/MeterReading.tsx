@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -9,17 +9,23 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Gauge } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Gauge, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function MeterReading() {
   const { isDealer, dealerBranchId } = useDealerBranch();
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const [selectedBranch, setSelectedBranch] = useState(dealerBranchId || "");
   const [selectedShift, setSelectedShift] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [meters, setMeters] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
+  const [rtts, setRtts] = useState<Record<string, number>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -87,7 +93,7 @@ export default function MeterReading() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, opening_meter, closing_meter")
+        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id")
         .eq("branch_id", branchId!)
         .eq("shift_id", selectedShift)
         .eq("date", selectedDate);
@@ -100,6 +106,61 @@ export default function MeterReading() {
     const prev = prevMeters?.find((m) => m.pump_id === pumpId);
     return prev ? Number(prev.closing_meter) : 0;
   };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!branchId || !selectedShift) throw new Error("Select branch and shift");
+      const pumpIds = Object.keys({ ...meters, ...openings, ...rtts });
+      if (pumpIds.length === 0) throw new Error("No readings to save");
+
+      // Get any attendant assigned to this branch as fallback
+      const { data: anyAttendant } = await supabase
+        .from("attendants")
+        .select("id")
+        .eq("branch_id", branchId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+
+      const rows = pumpIds.map((pumpId) => {
+        const existing = existingReadings?.find((r) => r.pump_id === pumpId);
+        const opening =
+          openings[pumpId] ?? existing?.opening_meter ?? getOpeningMeter(pumpId);
+        const closing = meters[pumpId] ?? existing?.closing_meter ?? 0;
+        const rtt = rtts[pumpId] ?? existing?.rtt_usg ?? 0;
+        const attendantId = existing?.attendant_id ?? anyAttendant?.id;
+        if (!attendantId) {
+          throw new Error("No attendant available for this branch. Assign one first.");
+        }
+        return {
+          branch_id: branchId,
+          shift_id: selectedShift,
+          date: selectedDate,
+          pump_id: pumpId,
+          attendant_id: attendantId,
+          opening_meter: Number(opening) || 0,
+          closing_meter: Number(closing) || 0,
+          rtt_usg: Number(rtt) || 0,
+          unit_price_usd: 0,
+          created_by: user?.id ?? null,
+        };
+      });
+
+      const { error } = await supabase
+        .from("shift_sales_reports")
+        .upsert(rows, { onConflict: "branch_id,pump_id,shift_id,date" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Meter readings saved");
+      qc.invalidateQueries({ queryKey: ["existing-meter-readings"] });
+      qc.invalidateQueries({ queryKey: ["prev-meters-batch"] });
+      setMeters({});
+      setOpenings({});
+      setRtts({});
+    },
+    onError: (err: any) => toast.error(err.message ?? "Failed to save"),
+  });
 
   return (
     <AppLayout title="Meter Readings" subtitle="Record opening and closing meter readings per shift">
@@ -133,9 +194,19 @@ export default function MeterReading() {
       {branchId && selectedShift && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Gauge className="h-5 w-5 text-primary" /> Pump Meter Readings
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-primary" /> Pump Meter Readings
+              </CardTitle>
+              <Button
+                size="sm"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saveMutation.isPending ? "Saving..." : "Save Readings"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -145,6 +216,7 @@ export default function MeterReading() {
                   <TableHead>Product</TableHead>
                   <TableHead className="text-right">Opening Meter</TableHead>
                   <TableHead className="text-right">Closing Meter</TableHead>
+                  <TableHead className="text-right">RTT (USG)</TableHead>
                   <TableHead className="text-right">Volume (USG)</TableHead>
                 </TableRow>
               </TableHeader>
@@ -155,7 +227,9 @@ export default function MeterReading() {
                   const opening =
                     openings[pump.id] ?? existing?.opening_meter ?? carryOver;
                   const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
-                  const volume = closing !== "" ? Number(closing) - Number(opening) : null;
+                  const rtt = rtts[pump.id] ?? existing?.rtt_usg ?? 0;
+                  const volume =
+                    closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : null;
                   return (
                     <TableRow key={pump.id}>
                       <TableCell className="font-medium">{pump.name}</TableCell>
@@ -165,15 +239,29 @@ export default function MeterReading() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Input
-                          type="number"
-                          className="w-32 ml-auto"
-                          value={openings[pump.id] ?? existing?.opening_meter ?? carryOver}
-                          onChange={(e) =>
-                            setOpenings((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
-                          }
-                          placeholder="Opening"
-                        />
+                        <div className="flex items-center justify-end gap-1">
+                          <Input
+                            type="number"
+                            className="w-28"
+                            value={openings[pump.id] ?? existing?.opening_meter ?? carryOver}
+                            onChange={(e) =>
+                              setOpenings((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                            }
+                            placeholder="Opening"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 shrink-0"
+                            title="Reset to carry-over"
+                            onClick={() =>
+                              setOpenings((prev) => ({ ...prev, [pump.id]: Number(carryOver) }))
+                            }
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
@@ -182,6 +270,17 @@ export default function MeterReading() {
                           value={meters[pump.id] ?? ""}
                           onChange={(e) => setMeters((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))}
                           placeholder="Enter closing"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          className="w-24 ml-auto"
+                          value={rtts[pump.id] ?? existing?.rtt_usg ?? 0}
+                          onChange={(e) =>
+                            setRtts((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                          }
+                          placeholder="RTT"
                         />
                       </TableCell>
                       <TableCell className="text-right">
