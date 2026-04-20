@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Droplets, Pencil } from "lucide-react";
+import { Droplets, History, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface TankCardProps {
@@ -10,6 +10,12 @@ interface TankCardProps {
   branch: string;
   lastUpdated?: string;
   onEdit?: () => void;
+  onShowHistory?: () => void;
+  // Stock breakdown (optional)
+  latestDipDate?: string | null;
+  openingLevel?: number | null;
+  deliveriesSinceDip?: number | null;
+  computedClosing?: number | null;
 }
 
 export function TankCard({
@@ -20,6 +26,11 @@ export function TankCard({
   branch,
   lastUpdated,
   onEdit,
+  onShowHistory,
+  latestDipDate,
+  openingLevel,
+  deliveriesSinceDip,
+  computedClosing,
 }: TankCardProps) {
   const percentage = Math.round((currentLevel / capacity) * 100);
 
@@ -89,6 +100,11 @@ export function TankCard({
           >
             {product}
           </span>
+          {onShowHistory && (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onShowHistory} title="Stock history">
+              <History className="h-4 w-4" />
+            </Button>
+          )}
           {onEdit && (
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
               <Pencil className="h-4 w-4" />
