@@ -1,12 +1,20 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Droplets, Truck } from "lucide-react";
-import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Droplets, Truck, Download, TrendingUp } from "lucide-react";
+import { format, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
+import { downloadCSV } from "@/lib/csv-export";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
+} from "recharts";
 
 interface StockHistoryDialogProps {
   open: boolean;
@@ -27,6 +35,9 @@ type HistoryEvent = {
 };
 
 export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capacity }: StockHistoryDialogProps) {
+  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
+  const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
+
   const { data, isLoading } = useQuery({
     queryKey: ["tank-stock-history", tankId],
     enabled: open && !!tankId,
@@ -88,65 +99,144 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
           return { id: ev.id, date: ev.date, timestamp: ev.timestamp, type: "delivery", label: ev.label, qty: ev.qty ?? 0, resultingLevel: running };
         }
       });
-
-      return computed.reverse();
+      return computed;
     },
   });
 
+  // Filter by date range (chronological, ascending) for chart, then reversed for table
+  const filteredAsc = useMemo(() => {
+    if (!data) return [];
+    return data.filter((ev) => ev.date >= dateFrom && ev.date <= dateTo);
+  }, [data, dateFrom, dateTo]);
+
+  const filteredDesc = useMemo(() => [...filteredAsc].reverse(), [filteredAsc]);
+
+  const chartData = useMemo(
+    () =>
+      filteredAsc.map((ev) => ({
+        date: format(new Date(ev.date), "MMM dd"),
+        level: ev.resultingLevel,
+        type: ev.type,
+      })),
+    [filteredAsc]
+  );
+
+  const handleExport = () => {
+    downloadCSV(
+      `stock-history-${tankName}-${dateFrom}-to-${dateTo}.csv`,
+      ["Date", "Type", "Description", "Change (USG)", "Running Balance (USG)"],
+      filteredDesc.map((ev) => [
+        ev.date,
+        ev.type === "dip" ? "Dip" : "Delivery",
+        ev.label,
+        ev.type === "delivery" ? `+${ev.qty}` : `=${ev.qty}`,
+        ev.resultingLevel,
+      ])
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Stock History — {tankName}</DialogTitle>
         </DialogHeader>
-        <div className="overflow-y-auto flex-1">
+
+        {/* Filters + Export */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 border-b border-border pb-3">
+          <div className="space-y-1">
+            <Label className="text-xs">From</Label>
+            <Input type="date" className="h-9 w-full sm:w-40" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">To</Label>
+            <Input type="date" className="h-9 w-full sm:w-40" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+          <div className="flex-1" />
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filteredDesc.length}>
+            <Download className="h-4 w-4 mr-1.5" /> Export CSV
+          </Button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 space-y-4 pt-2">
           {isLoading ? (
             <div className="space-y-2 p-2">
               {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
-          ) : !data || data.length === 0 ? (
+          ) : filteredAsc.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-12">
-              No dip readings or deliveries recorded for this tank yet.
+              No events for the selected date range.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Change</TableHead>
-                  <TableHead className="text-right">Running Balance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((ev) => (
-                  <TableRow key={ev.id}>
-                    <TableCell className="text-xs whitespace-nowrap">{format(new Date(ev.date), "MMM dd, yyyy")}</TableCell>
-                    <TableCell>
-                      {ev.type === "dip" ? (
-                        <Badge variant="outline" className="text-xs gap-1 border-primary/40 text-primary">
-                          <Droplets className="h-3 w-3" /> Dip
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs gap-1 border-success/40 text-success">
-                          <Truck className="h-3 w-3" /> Delivery
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">{ev.label}</TableCell>
-                    <TableCell className={cn("text-right font-medium text-sm",
-                      ev.type === "delivery" ? "text-success" : "text-muted-foreground"
-                    )}>
-                      {ev.type === "delivery" ? `+${ev.qty.toLocaleString()}` : `→ ${ev.qty.toLocaleString()}`}
-                    </TableCell>
-                    <TableCell className="text-right font-bold">
-                      {ev.resultingLevel.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">USG</span>
-                    </TableCell>
+            <>
+              {/* Line Chart */}
+              <div className="rounded-lg border border-border bg-card p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Tank Level Over Time</span>
+                </div>
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <Tooltip
+                        contentStyle={{
+                          background: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                        }}
+                        formatter={(value: number) => [`${value.toLocaleString()} USG`, "Level"]}
+                      />
+                      <ReferenceLine y={capacity} stroke="hsl(var(--destructive))" strokeDasharray="4 4" label={{ value: "Capacity", fontSize: 10, fill: "hsl(var(--destructive))", position: "right" }} />
+                      <Line type="monotone" dataKey="level" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Event Table */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Change</TableHead>
+                    <TableHead className="text-right">Running Balance</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredDesc.map((ev) => (
+                    <TableRow key={ev.id}>
+                      <TableCell className="text-xs whitespace-nowrap">{format(new Date(ev.date), "MMM dd, yyyy")}</TableCell>
+                      <TableCell>
+                        {ev.type === "dip" ? (
+                          <Badge variant="outline" className="text-xs gap-1 border-primary/40 text-primary">
+                            <Droplets className="h-3 w-3" /> Dip
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs gap-1 border-success/40 text-success">
+                            <Truck className="h-3 w-3" /> Delivery
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{ev.label}</TableCell>
+                      <TableCell className={cn("text-right font-medium text-sm",
+                        ev.type === "delivery" ? "text-success" : "text-muted-foreground"
+                      )}>
+                        {ev.type === "delivery" ? `+${ev.qty.toLocaleString()}` : `→ ${ev.qty.toLocaleString()}`}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {ev.resultingLevel.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">USG</span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </>
           )}
         </div>
       </DialogContent>
