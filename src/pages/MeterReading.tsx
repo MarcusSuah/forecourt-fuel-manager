@@ -742,6 +742,7 @@ export default function MeterReading() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <UnsavedChangesDialog {...unsavedDialogProps} />
     </AppLayout>
   );
 }
