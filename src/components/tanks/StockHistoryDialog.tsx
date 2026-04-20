@@ -14,7 +14,7 @@ import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCSV } from "@/lib/csv-export";
 import { toast } from "sonner";
-import { usePermissions } from "@/hooks/usePermissions";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from "recharts";
@@ -50,8 +50,8 @@ export function StockHistoryDialog({
   const [reconThreshold, setReconThreshold] = useState<number>(initialThreshold ?? 50);
   const [alertedKeys, setAlertedKeys] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
-  const { isAdmin, isSupervisor } = usePermissions();
-  const canEditThreshold = isAdmin || isSupervisor;
+  const { user } = useAuth();
+  const canEditThreshold = user?.role === "admin" || user?.role === "supervisor";
 
   // Sync threshold prop -> state when reopened with a different tank
   useEffect(() => {
