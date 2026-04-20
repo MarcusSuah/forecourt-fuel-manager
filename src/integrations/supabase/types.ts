@@ -854,6 +854,73 @@ export type Database = {
           },
         ]
       }
+      reconciliation_alerts: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          loss_usg: number
+          notification_error: string | null
+          notification_status: string | null
+          notified_emails: string[] | null
+          notified_phones: string[] | null
+          severity: string
+          stock_reading_id: string | null
+          tank_id: string
+          threshold_usg: number
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          loss_usg: number
+          notification_error?: string | null
+          notification_status?: string | null
+          notified_emails?: string[] | null
+          notified_phones?: string[] | null
+          severity?: string
+          stock_reading_id?: string | null
+          tank_id: string
+          threshold_usg: number
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          loss_usg?: number
+          notification_error?: string | null
+          notification_status?: string | null
+          notified_emails?: string[] | null
+          notified_phones?: string[] | null
+          severity?: string
+          stock_reading_id?: string | null
+          tank_id?: string
+          threshold_usg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_alerts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_alerts_stock_reading_id_fkey"
+            columns: ["stock_reading_id"]
+            isOneToOne: false
+            referencedRelation: "stock_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_alerts_tank_id_fkey"
+            columns: ["tank_id"]
+            isOneToOne: false
+            referencedRelation: "tanks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string
@@ -1140,6 +1207,7 @@ export type Database = {
           is_active: boolean
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
+          reconciliation_threshold_usg: number
           status: Database["public"]["Enums"]["tank_status"]
           threshold_usg: number
           updated_at: string
@@ -1153,6 +1221,7 @@ export type Database = {
           is_active?: boolean
           name: string
           product_type: Database["public"]["Enums"]["product_type"]
+          reconciliation_threshold_usg?: number
           status?: Database["public"]["Enums"]["tank_status"]
           threshold_usg?: number
           updated_at?: string
@@ -1166,6 +1235,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           product_type?: Database["public"]["Enums"]["product_type"]
+          reconciliation_threshold_usg?: number
           status?: Database["public"]["Enums"]["tank_status"]
           threshold_usg?: number
           updated_at?: string
