@@ -208,7 +208,32 @@ export function Header({ title, subtitle }: HeaderProps) {
                 {alertCount === 0 ? (
                   <div className="p-6 text-center text-sm text-muted-foreground">All systems normal ✓</div>
                 ) : (
-                  visibleAlerts.map(t => {
+                  <>
+                  {visibleRecon.map((a: any) => {
+                    const key = `recon-${a.id}`;
+                    return (
+                      <div key={a.id} className="flex items-start gap-2 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors">
+                        <div className="h-2 w-2 rounded-full mt-1.5 shrink-0 bg-destructive animate-pulse" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">Critical variance · {a.tanks?.name ?? "Tank"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.branches?.name ?? ""} · Loss {Math.abs(Number(a.loss_usg)).toFixed(1)} USG (±{Number(a.threshold_usg).toLocaleString()})
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] shrink-0 border-destructive text-destructive">RECON</Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
+                          title="Dismiss"
+                          onClick={(e) => { e.stopPropagation(); dismiss({ key, type: "reconciliation" }); }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  {visibleAlerts.map(t => {
                     const key = t.pct < 20 ? `tank-crit-${t.id}` : `tank-low-${t.id}`;
                     const type = t.pct < 20 ? "tank-critical" : "tank-low";
                     return (
@@ -232,7 +257,8 @@ export function Header({ title, subtitle }: HeaderProps) {
                         </Button>
                       </div>
                     );
-                  })
+                  })}
+                  </>
                 )}
               </div>
               <div className="border-t border-border p-2">
