@@ -110,11 +110,6 @@ export default function AdminLoginActivities() {
     return () => { supabase.removeChannel(channel); };
   }, [isAdmin, qc, toast]);
 
-  // Access guard runs after all hooks
-  if (user && !isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const filtered = useMemo(() => {
     const f = filter.trim().toLowerCase();
     if (!f) return rows ?? [];
@@ -165,6 +160,11 @@ export default function AdminLoginActivities() {
     });
     return { total: list.length, uniqueUsers, byRole: Array.from(byRole.entries()) };
   }, [rows]);
+
+  // Access guard runs after all hooks
+  if (user && !isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <AppLayout title="Login Activities" subtitle="Audit trail of all user sign-ins">
