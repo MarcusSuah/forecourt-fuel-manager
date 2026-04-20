@@ -8,7 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus, ShieldAlert, AlertTriangle } from "lucide-react";
 import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCSV } from "@/lib/csv-export";
@@ -37,6 +38,7 @@ type HistoryEvent = {
 export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capacity }: StockHistoryDialogProps) {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [reconThreshold, setReconThreshold] = useState<number>(50);
 
   const { data, isLoading } = useQuery({
     queryKey: ["tank-stock-history", tankId],
@@ -241,7 +243,18 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
               No events for the selected date range.
             </p>
           ) : (
-            <>
+            <Tabs defaultValue="history" className="w-full">
+              <TabsList className="mb-3">
+                <TabsTrigger value="history">History</TabsTrigger>
+                <TabsTrigger value="reconciliation" className="gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5" /> Reconciliation
+                  {(() => {
+                    const flagged = filteredWithVariance.filter(e => e.type === "dip" && e.dipVariance !== null && e.dipVariance < -reconThreshold).length;
+                    return flagged > 0 ? <Badge variant="destructive" className="ml-1 h-4 px-1.5 text-[10px]">{flagged}</Badge> : null;
+                  })()}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="history" className="space-y-4 mt-0">
               {/* Line Chart */}
               <div className="rounded-lg border border-border bg-card p-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -322,7 +335,113 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
                   ))}
                 </TableBody>
               </Table>
-            </>
+              </TabsContent>
+
+              <TabsContent value="reconciliation" className="space-y-3 mt-0">
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldAlert className="h-4 w-4 text-destructive" />
+                    <span className="text-sm font-medium">Suspicious Loss Detection</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Any dip showing a loss greater than the threshold below (compared to the previous dip) is flagged as a potential leak or theft event.
+                  </p>
+                  <div className="flex items-end gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Loss threshold (USG)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-9 w-32"
+                        value={reconThreshold}
+                        onChange={(e) => setReconThreshold(Math.max(1, Number(e.target.value) || 0))}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pb-1">
+                      {[25, 50, 100, 200].map(v => (
+                        <Button key={v} variant={reconThreshold === v ? "default" : "outline"} size="sm" className="h-7 text-xs" onClick={() => setReconThreshold(v)}>
+                          &gt; {v}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {(() => {
+                  const flagged = filteredWithVariance
+                    .filter(e => e.type === "dip" && e.dipVariance !== null && e.dipVariance < -reconThreshold)
+                    .reverse();
+                  const totalLoss = flagged.reduce((s, e) => s + (e.dipVariance ?? 0), 0);
+
+                  if (flagged.length === 0) {
+                    return (
+                      <div className="text-center py-10 rounded-lg border border-dashed border-border">
+                        <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-2">
+                          <ShieldAlert className="h-5 w-5 text-success" />
+                        </div>
+                        <p className="font-medium text-sm">No suspicious losses detected</p>
+                        <p className="text-xs text-muted-foreground">All dip variances are within the {reconThreshold} USG threshold.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5">
+                          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-destructive">
+                            <AlertTriangle className="h-3 w-3" /> Flagged Events
+                          </div>
+                          <p className="text-base font-bold mt-0.5 text-destructive">{flagged.length}</p>
+                        </div>
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5">
+                          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-destructive">
+                            <ArrowDown className="h-3 w-3" /> Total Loss
+                          </div>
+                          <p className="text-base font-bold mt-0.5 text-destructive">
+                            {totalLoss.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-[10px] font-normal text-muted-foreground">USG</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Dip</TableHead>
+                            <TableHead className="text-right">Loss vs Prev</TableHead>
+                            <TableHead className="text-right">Level</TableHead>
+                            <TableHead>Severity</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {flagged.map((ev) => {
+                            const loss = Math.abs(ev.dipVariance ?? 0);
+                            const severe = loss > reconThreshold * 2;
+                            return (
+                              <TableRow key={`recon-${ev.id}`} className="bg-destructive/5">
+                                <TableCell className="text-xs whitespace-nowrap">{format(new Date(ev.date), "MMM dd, yyyy")}</TableCell>
+                                <TableCell className="text-sm">{ev.label}</TableCell>
+                                <TableCell className="text-right font-bold text-destructive">
+                                  −{loss.toLocaleString(undefined, { maximumFractionDigits: 1 })} <span className="text-xs font-normal text-muted-foreground">USG</span>
+                                </TableCell>
+                                <TableCell className="text-right text-sm">{ev.resultingLevel.toLocaleString()}</TableCell>
+                                <TableCell>
+                                  <Badge variant={severe ? "destructive" : "outline"} className={cn("text-[10px] gap-1", !severe && "border-warning/40 text-warning")}>
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {severe ? "Critical" : "Investigate"}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </>
+                  );
+                })()}
+              </TabsContent>
+            </Tabs>
           )}
         </div>
       </DialogContent>

@@ -1,15 +1,16 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
+import { useDismissedNotifications } from "@/hooks/useDismissedNotifications";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Bell, Droplets, Truck, DollarSign, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Bell, Droplets, Truck, DollarSign, CheckCircle2, X, Eye, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, formatDistanceToNow } from "date-fns";
 
@@ -26,7 +27,9 @@ type Notification = {
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
+  const { dismissedKeys, dismiss, dismissMany, restoreAll } = useDismissedNotifications();
   const sevenDaysAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -80,6 +83,26 @@ export default function Notifications() {
       return { cash: cashRes.data ?? [], sales: salesRes.data ?? [] };
     },
   });
+
+  // Realtime: refresh notifications when underlying tables change
+  useEffect(() => {
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tanks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-tanks"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "fuel_deliveries" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-deliveries"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_deposits" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-cash-variance"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "shift_sales_reports" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-cash-variance"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const notifications = useMemo<Notification[]>(() => {
     const list: Notification[] = [];
@@ -159,12 +182,13 @@ export default function Notifications() {
       });
     }
 
-    return list.sort((a, b) => {
+    const visible = list.filter((n) => !dismissedKeys.has(n.id));
+    return visible.sort((a, b) => {
       const sev = { critical: 0, warning: 1, info: 2, success: 3 };
       if (sev[a.severity] !== sev[b.severity]) return sev[a.severity] - sev[b.severity];
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
-  }, [tanks, deliveries, cashSales, thresholds]);
+  }, [tanks, deliveries, cashSales, thresholds, dismissedKeys]);
 
   const isLoading = tanksLoading || delsLoading;
 
@@ -208,25 +232,39 @@ export default function Notifications() {
             : n.severity === "success" ? "bg-success/10 border-success/30 text-success"
             : "bg-muted/50 border-border text-foreground";
           return (
-            <button
+            <div
               key={n.id}
-              onClick={() => n.link && navigate(n.link)}
-              className={cn("w-full text-left flex items-start gap-3 p-3 rounded-lg border transition-colors hover:bg-muted/30", tone)}
+              className={cn("group w-full flex items-start gap-3 p-3 rounded-lg border transition-colors hover:bg-muted/30", tone)}
             >
-              <div className="h-8 w-8 rounded-full bg-background/60 flex items-center justify-center shrink-0">
-                <Icon className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-sm">{n.title}</p>
-                  <Badge variant="outline" className="text-[10px] shrink-0 capitalize">{n.severity}</Badge>
+              <button
+                type="button"
+                onClick={() => n.link && navigate(n.link)}
+                className="flex items-start gap-3 flex-1 min-w-0 text-left"
+              >
+                <div className="h-8 w-8 rounded-full bg-background/60 flex items-center justify-center shrink-0">
+                  <Icon className="h-4 w-4" />
                 </div>
-                <p className="text-xs mt-0.5 text-foreground/80">{n.description}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {n.branchName} · {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
-                </p>
-              </div>
-            </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-sm">{n.title}</p>
+                    <Badge variant="outline" className="text-[10px] shrink-0 capitalize">{n.severity}</Badge>
+                  </div>
+                  <p className="text-xs mt-0.5 text-foreground/80">{n.description}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {n.branchName} · {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
+                  </p>
+                </div>
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 opacity-60 hover:opacity-100"
+                title="Dismiss"
+                onClick={(e) => { e.stopPropagation(); dismiss({ key: n.id, type: n.type }); }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           );
         })}
       </div>
@@ -237,12 +275,41 @@ export default function Notifications() {
     <AppLayout title="Notifications" subtitle={subtitle}>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Bell className="h-4 w-4 text-primary" /> Activity Center
-            {notifications.length > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs">{notifications.length}</Badge>
-            )}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="h-4 w-4 text-primary" /> Activity Center
+              {notifications.length > 0 && (
+                <Badge variant="outline" className="ml-2 text-xs">{notifications.length}</Badge>
+              )}
+              {dismissedKeys.size > 0 && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  <Eye className="h-3 w-3 mr-1" />{dismissedKeys.size} dismissed
+                </Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-1.5">
+              {notifications.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => dismissMany(notifications.map((n) => ({ key: n.id, type: n.type })))}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark all as read
+                </Button>
+              )}
+              {dismissedKeys.size > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => restoreAll()}
+                >
+                  <Undo2 className="h-3.5 w-3.5 mr-1" /> Restore dismissed
+                </Button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="all">
