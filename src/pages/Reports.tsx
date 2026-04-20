@@ -58,6 +58,7 @@ const periodPresets = [
 ];
 
 export default function Reports() {
+  const { user } = useAuth();
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
   const { branchFilter, setBranchFilter, isBranchDisabled } = useBranchFilter();
