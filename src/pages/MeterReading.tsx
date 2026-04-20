@@ -361,6 +361,22 @@ export default function MeterReading() {
             <Save className="h-4 w-4 mr-1" />
             Save now
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setOpenings({});
+              setMeters({});
+              setRtts({});
+              setPrices({});
+              setAttendantSel({});
+              toast.success("Local changes discarded");
+            }}
+            disabled={saveMutation.isPending}
+          >
+            <RotateCcw className="h-4 w-4 mr-1" />
+            Discard changes
+          </Button>
         </div>
       )}
       <Card className="mb-6">
