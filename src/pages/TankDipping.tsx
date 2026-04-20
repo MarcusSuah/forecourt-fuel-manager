@@ -11,10 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle } from "lucide-react";
+import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Settings2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { Link } from "react-router-dom";
 
 export default function TankDipping() {
   const { user } = useAuth();
