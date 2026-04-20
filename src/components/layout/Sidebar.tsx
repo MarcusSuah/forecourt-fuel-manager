@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Fuel, Users, Building2, Receipt, Wallet,
   FileBarChart, Settings, ChevronLeft, ChevronRight, Droplets,
@@ -52,6 +54,21 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const { user, signOut } = useAuth();
   const { isDealer, dealerBranchName } = useDealerBranch();
   const { hasPermission } = usePermissions();
+  const isAdmin = user?.role === "admin";
+
+  // Fetch company logo (skip for admin users — they keep the default fuel icon)
+  const { data: companyLogoUrl } = useQuery({
+    queryKey: ["sidebar-company-logo"],
+    enabled: !isAdmin,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "system_preferences")
+        .maybeSingle();
+      return ((data?.value as any)?.logo_url as string | undefined) ?? null;
+    },
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -80,9 +97,19 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     >
       <div className="flex h-20 items-center justify-between px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
-            <Fuel className="h-5 w-5 text-sidebar-primary-foreground" />
-          </div>
+          {!isAdmin && companyLogoUrl ? (
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary/10 overflow-hidden">
+              <img
+                src={companyLogoUrl}
+                alt="Company logo"
+                className="h-full w-full object-contain"
+              />
+            </div>
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary">
+              <Fuel className="h-5 w-5 text-sidebar-primary-foreground" />
+            </div>
+          )}
           {!collapsed && (
             <div className="flex flex-col">
               <span className="font-bold text-lg text-sidebar-foreground">FMS</span>
