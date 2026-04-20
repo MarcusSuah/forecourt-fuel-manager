@@ -25,6 +25,10 @@ interface StockHistoryDialogProps {
   tankId: string;
   tankName: string;
   capacity: number;
+  branchId?: string;
+  branchName?: string;
+  productType?: string;
+  initialThreshold?: number;
 }
 
 type HistoryEvent = {
@@ -37,10 +41,37 @@ type HistoryEvent = {
   resultingLevel: number;
 };
 
-export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capacity }: StockHistoryDialogProps) {
+export function StockHistoryDialog({
+  open, onOpenChange, tankId, tankName, capacity,
+  branchId, branchName, productType, initialThreshold,
+}: StockHistoryDialogProps) {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [reconThreshold, setReconThreshold] = useState<number>(50);
+  const [reconThreshold, setReconThreshold] = useState<number>(initialThreshold ?? 50);
+  const [alertedKeys, setAlertedKeys] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+  const { isAdmin, isSupervisor } = usePermissions();
+  const canEditThreshold = isAdmin || isSupervisor;
+
+  // Sync threshold prop -> state when reopened with a different tank
+  useEffect(() => {
+    if (typeof initialThreshold === "number") setReconThreshold(initialThreshold);
+  }, [initialThreshold, tankId]);
+
+  const saveThresholdMutation = useMutation({
+    mutationFn: async (newVal: number) => {
+      const { error } = await supabase
+        .from("tanks")
+        .update({ reconciliation_threshold_usg: newVal })
+        .eq("id", tankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Threshold saved for this tank");
+      queryClient.invalidateQueries({ queryKey: ["tanks"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["tank-stock-history", tankId],
