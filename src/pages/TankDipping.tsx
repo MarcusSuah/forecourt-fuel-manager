@@ -453,6 +453,33 @@ export default function TankDipping() {
                       <div className="flex items-center gap-3 shrink-0">
                         <span className="text-destructive font-semibold">{Number(a.loss_usg).toLocaleString()} USG</span>
                         <Badge variant={a.severity === "critical" ? "destructive" : "secondary"} className="text-[10px] capitalize">{a.severity}</Badge>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2">
+                              <Check className="h-3 w-3 mr-1" /> Resolve
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72" align="end">
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">Resolve alert</p>
+                              <p className="text-xs text-muted-foreground">{a.tanks?.name ?? "Tank"} · {Number(a.loss_usg).toLocaleString()} USG</p>
+                              <Textarea
+                                placeholder="Optional resolution note (root cause, action taken)..."
+                                value={resolveNotes[a.id] ?? ""}
+                                onChange={(e) => setResolveNotes((p) => ({ ...p, [a.id]: e.target.value }))}
+                                className="min-h-[70px] text-xs"
+                              />
+                              <Button
+                                size="sm"
+                                className="w-full"
+                                disabled={resolveMutation.isPending}
+                                onClick={() => resolveMutation.mutate({ alertId: a.id, note: resolveNotes[a.id] ?? "" })}
+                              >
+                                Mark resolved
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </li>
                   ))}
