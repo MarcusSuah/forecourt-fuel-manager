@@ -275,12 +275,41 @@ export default function Notifications() {
     <AppLayout title="Notifications" subtitle={subtitle}>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Bell className="h-4 w-4 text-primary" /> Activity Center
-            {notifications.length > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs">{notifications.length}</Badge>
-            )}
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="h-4 w-4 text-primary" /> Activity Center
+              {notifications.length > 0 && (
+                <Badge variant="outline" className="ml-2 text-xs">{notifications.length}</Badge>
+              )}
+              {dismissedKeys.size > 0 && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  <Eye className="h-3 w-3 mr-1" />{dismissedKeys.size} dismissed
+                </Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-1.5">
+              {notifications.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => dismissMany(notifications.map((n) => ({ key: n.id, type: n.type })))}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark all as read
+                </Button>
+              )}
+              {dismissedKeys.size > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => restoreAll()}
+                >
+                  <Undo2 className="h-3.5 w-3.5 mr-1" /> Restore dismissed
+                </Button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="all">
