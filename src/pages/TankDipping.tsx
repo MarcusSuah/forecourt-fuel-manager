@@ -235,6 +235,39 @@ export default function TankDipping() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  // Update reconciliation threshold for a tank
+  const thresholdMutation = useMutation({
+    mutationFn: async ({ tankId, value }: { tankId: string; value: number }) => {
+      const { error } = await supabase
+        .from("tanks")
+        .update({ reconciliation_threshold_usg: value })
+        .eq("id", tankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Threshold updated");
+      queryClient.invalidateQueries({ queryKey: ["tanks-dipping"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Recent open (unresolved) reconciliation alerts for selected branch
+  const { data: recentAlerts } = useQuery({
+    queryKey: ["recent-open-alerts", branchId],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reconciliation_alerts")
+        .select("id, created_at, loss_usg, threshold_usg, severity, tank_id, tanks(name, product_type)")
+        .eq("branch_id", branchId!)
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <AppLayout title="Daily Tank Dipping" subtitle="Record opening and closing dip readings per shift">
       <Card className="mb-6">
