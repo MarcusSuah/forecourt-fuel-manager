@@ -24,6 +24,7 @@ export default function TankDipping() {
   const [selectedShift, setSelectedShift] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [dips, setDips] = useState<Record<string, number>>({});
+  const [openings, setOpenings] = useState<Record<string, number>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -101,9 +102,44 @@ export default function TankDipping() {
     },
   });
 
-  const getOpeningDip = (tankId: string) => {
+  // Pump meter sales for the same shift/date/branch, grouped by tank via tank_pump_assignments
+  const { data: pumpSales } = useQuery({
+    queryKey: ["pump-sales-by-tank", branchId, selectedDate, selectedShift],
+    enabled: !!branchId && !!selectedShift,
+    queryFn: async () => {
+      const { data: sales, error: e1 } = await supabase
+        .from("shift_sales_reports")
+        .select("pump_id, sales_usg")
+        .eq("branch_id", branchId!)
+        .eq("shift_id", selectedShift)
+        .eq("date", selectedDate);
+      if (e1) throw e1;
+      const { data: links, error: e2 } = await supabase
+        .from("tank_pump_assignments")
+        .select("tank_id, pump_id");
+      if (e2) throw e2;
+      const byTank: Record<string, number> = {};
+      (sales ?? []).forEach((s) => {
+        const tankIds = (links ?? []).filter((l) => l.pump_id === s.pump_id).map((l) => l.tank_id);
+        tankIds.forEach((tid) => {
+          byTank[tid] = (byTank[tid] ?? 0) + Number(s.sales_usg ?? 0);
+        });
+      });
+      return byTank;
+    },
+  });
+
+  // Carry-over default for opening dip (previous shift's closing)
+  const getCarryOverOpening = (tankId: string) => {
     const prev = prevDips?.find((d) => d.tank_id === tankId);
     return prev ? Number(prev.physical_level_usg) : 0;
+  };
+
+  const getOpeningDip = (tankId: string) => {
+    if (openings[tankId] !== undefined) return openings[tankId];
+    const saved = currentReadings?.find((r) => r.tank_id === tankId);
+    if (saved) return Number(saved.theoretical_level_usg);
+    return getCarryOverOpening(tankId);
   };
 
   const saveMutation = useMutation({
@@ -128,6 +164,7 @@ export default function TankDipping() {
       toast.success("Dip readings saved");
       queryClient.invalidateQueries({ queryKey: ["current-dips"] });
       setDips({});
+      setOpenings({});
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -180,16 +217,20 @@ export default function TankDipping() {
                   <TableHead>Tank</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead className="text-right">Capacity (USG)</TableHead>
-                  <TableHead className="text-right">Opening Dip (USG)</TableHead>
+                  <TableHead>Opening Dip (USG)</TableHead>
                   <TableHead>Closing Dip (USG)</TableHead>
+                  <TableHead className="text-right">Sales (USG)</TableHead>
                   <TableHead className="text-right">Variance</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(tanks ?? []).map((tank) => {
                   const opening = getOpeningDip(tank.id);
-                  const closing = dips[tank.id] ?? currentReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? "";
-                  const variance = closing !== "" ? Number(closing) - opening : null;
+                  const closingRaw = dips[tank.id] ?? currentReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? "";
+                  const hasClosing = closingRaw !== "" && closingRaw !== null && closingRaw !== undefined;
+                  const tankSales = hasClosing ? opening - Number(closingRaw) : null;
+                  const meterSales = pumpSales?.[tank.id] ?? 0;
+                  const variance = tankSales !== null ? tankSales - meterSales : null;
                   return (
                     <TableRow key={tank.id}>
                       <TableCell className="font-medium">{tank.name}</TableCell>
@@ -199,19 +240,30 @@ export default function TankDipping() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">{Number(tank.capacity_usg).toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-medium">{opening.toLocaleString()}</TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           className="w-32"
-                          value={dips[tank.id] ?? ""}
+                          value={openings[tank.id] ?? opening}
+                          onChange={(e) => setOpenings((prev) => ({ ...prev, [tank.id]: Number(e.target.value) }))}
+                          placeholder="Opening dip"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          className="w-32"
+                          value={dips[tank.id] ?? (currentReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? "")}
                           onChange={(e) => setDips((prev) => ({ ...prev, [tank.id]: Number(e.target.value) }))}
                           placeholder="Enter dip"
                         />
                       </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {tankSales !== null ? tankSales.toLocaleString() : "—"}
+                      </TableCell>
                       <TableCell className="text-right">
                         {variance !== null && (
-                          <span className={cn("font-bold", variance >= 0 ? "text-success" : "text-destructive")}>
+                          <span className={cn("font-bold", Math.abs(variance) < 0.01 ? "text-success" : variance > 0 ? "text-warning" : "text-destructive")}>
                             {variance >= 0 ? "+" : ""}{variance.toLocaleString()}
                           </span>
                         )}
