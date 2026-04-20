@@ -65,12 +65,33 @@ export function Header({ title, subtitle }: HeaderProps) {
     refetchInterval: 30000,
   });
 
+  // Open (unresolved) reconciliation alerts → bell badge + popover list
+  const { data: reconAlerts } = useQuery({
+    queryKey: ["header-recon-alerts", dealerBranchId],
+    queryFn: async () => {
+      let q = supabase
+        .from("reconciliation_alerts")
+        .select("id, created_at, loss_usg, threshold_usg, severity, branch_id, tanks(name, product_type), branches(name)")
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30000,
+  });
+
   // Real-time tank updates so the bell badge reflects changes instantly
   useEffect(() => {
     const channel = supabase
       .channel("header-tanks-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "tanks" }, () => {
         queryClient.invalidateQueries({ queryKey: ["header-tank-alerts"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "reconciliation_alerts" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["header-recon-alerts"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
