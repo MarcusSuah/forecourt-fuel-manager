@@ -167,7 +167,9 @@ export default function Payroll() {
                 if (!payrollRecords?.length) return toast.error("No payroll data");
                 exportTableToPDF(`Payroll — ${MONTHS[parseInt(month)-1]} ${year}`, `Total Net: $${totalNet.toLocaleString()}`, ["Employee","Position","Gross","Bonuses","Deductions","Net Salary","Status"],
                   payrollRecords.map(r => [(r as any).employees?.full_name || "", (r as any).employees?.position || "", `$${Number(r.gross_salary).toLocaleString()}`, `+$${Number(r.bonuses).toLocaleString()}`, `-$${Number(r.deductions).toLocaleString()}`, `$${Number(r.net_salary).toLocaleString()}`, r.status]),
-                  [{ label: "Total Net Payroll", value: `$${totalNet.toLocaleString()}` }]);
+                  [{ label: "Total Net Payroll", value: `$${totalNet.toLocaleString()}` }],
+                  undefined,
+                  user?.profile?.full_name ?? user?.email ?? undefined);
               }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
             </div>
           </CardContent>

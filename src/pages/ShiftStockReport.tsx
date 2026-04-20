@@ -238,6 +238,7 @@ export default function ShiftStockReport() {
                     { label: "Net Variance", value: `${totalVariance >= 0 ? "+" : ""}${totalVariance.toLocaleString()} USG` },
                   ],
                   headerInfo,
+                  user?.profile?.full_name ?? user?.email ?? undefined,
                 );
               }}>
                 <Download className="h-4 w-4 mr-1" /> PDF

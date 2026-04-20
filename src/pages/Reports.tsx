@@ -200,6 +200,7 @@ export default function Reports() {
           { label: "Variance", value: `${grandTotals.variance >= 0 ? "+" : ""}$${grandTotals.variance.toFixed(2)}` },
         ],
         headerInfo,
+        user?.profile?.full_name ?? user?.email ?? undefined,
       );
     } else {
       exportTableToPDF(
@@ -208,6 +209,7 @@ export default function Reports() {
         branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), `$${b.salesUsd.toFixed(2)}`, `$${b.cashUsd.toFixed(2)}`, `${b.variance >= 0 ? "+" : ""}$${b.variance.toFixed(2)}`]),
         undefined,
         headerInfo,
+        user?.profile?.full_name ?? user?.email ?? undefined,
       );
     }
   };
