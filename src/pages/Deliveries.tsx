@@ -23,6 +23,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Plus, Truck, Package, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 export default function Deliveries() {
   const { user } = useAuth();
@@ -120,8 +122,17 @@ export default function Deliveries() {
   const totalDelivered = deliveries?.reduce((s, d) => s + Number(d.quantity_usg), 0) ?? 0;
   const todayCount = deliveries?.filter(d => d.delivery_date === format(new Date(), "yyyy-MM-dd")).length ?? 0;
 
+  const hasUnsavedChanges = dialogOpen && Boolean(
+    formTank || formQuantity || formSupplier || formDriver || formPlate || formReceipt || formNotes
+  );
+  const { dialogProps: guardDialog } = useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have an in-progress delivery entry. Leave without saving?"
+  );
+
   return (
     <AppLayout title="Fuel Deliveries" subtitle="Track incoming stock deliveries and receipts">
+      <UnsavedChangesDialog {...guardDialog} />
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <Select value={branchFilter} onValueChange={setBranchFilter}>

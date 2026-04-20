@@ -20,6 +20,8 @@ import { Save, Receipt, Calculator, Download, User } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 const MAX_PUMPS_PER_ATTENDANT = 4;
 
@@ -219,6 +221,18 @@ export default function SalesEntry() {
 
   const grandTotal = useMemo(() => pumpEntries.reduce((sum, e) => sum + calcSales(e).totalUsd, 0), [pumpEntries]);
 
+  // Unsaved-changes guard: any pump entry rows with content count as unsaved
+  const hasUnsavedChanges = useMemo(() => {
+    return pumpEntries.some(e =>
+      e.pump_id || e.opening_meter || e.closing_meter || e.unit_price_usd ||
+      (e.rtt_usg && e.rtt_usg !== "0")
+    );
+  }, [pumpEntries]);
+  const { dialogProps } = useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have unsaved sales entries. Leave without submitting?"
+  );
+
   const canSubmit = globalBranch && globalShift && selectedAttendant && pumpEntries.length > 0 && pumpEntries.every(
     e => e.pump_id && e.closing_meter && e.unit_price_usd &&
       parseFloat(e.closing_meter) >= parseFloat(e.opening_meter || "0")
@@ -253,6 +267,7 @@ export default function SalesEntry() {
 
   return (
     <AppLayout title="Attendant Sales Entry" subtitle="Record pump meter readings and calculate sales per shift">
+      <UnsavedChangesDialog {...dialogProps} />
       {/* Shift Details */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-4">

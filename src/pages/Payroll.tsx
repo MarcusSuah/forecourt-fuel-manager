@@ -18,6 +18,8 @@ import { toast } from "sonner";
 import { FileText, Play, Printer, Download } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -127,8 +129,15 @@ export default function Payroll() {
 
   const totalNet = payrollRecords?.reduce((s, r) => s + Number(r.net_salary), 0) || 0;
 
+  // Guard navigation while payroll is being generated
+  const { dialogProps: guardDialog } = useUnsavedChangesGuard(
+    generatePayroll.isPending,
+    "Payroll is being generated. Leave anyway?"
+  );
+
   return (
     <AppLayout title="Payroll" subtitle="Process monthly payroll and generate payslips">
+      <UnsavedChangesDialog {...guardDialog} />
       <div className="space-y-4">
         <Card>
           <CardHeader>
