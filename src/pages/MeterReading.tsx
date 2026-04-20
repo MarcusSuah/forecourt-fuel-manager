@@ -93,7 +93,7 @@ export default function MeterReading() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, opening_meter, closing_meter")
+        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id")
         .eq("branch_id", branchId!)
         .eq("shift_id", selectedShift)
         .eq("date", selectedDate);
@@ -106,6 +106,61 @@ export default function MeterReading() {
     const prev = prevMeters?.find((m) => m.pump_id === pumpId);
     return prev ? Number(prev.closing_meter) : 0;
   };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!branchId || !selectedShift) throw new Error("Select branch and shift");
+      const pumpIds = Object.keys({ ...meters, ...openings, ...rtts });
+      if (pumpIds.length === 0) throw new Error("No readings to save");
+
+      // Get any attendant assigned to this branch as fallback
+      const { data: anyAttendant } = await supabase
+        .from("attendants")
+        .select("id")
+        .eq("branch_id", branchId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+
+      const rows = pumpIds.map((pumpId) => {
+        const existing = existingReadings?.find((r) => r.pump_id === pumpId);
+        const opening =
+          openings[pumpId] ?? existing?.opening_meter ?? getOpeningMeter(pumpId);
+        const closing = meters[pumpId] ?? existing?.closing_meter ?? 0;
+        const rtt = rtts[pumpId] ?? existing?.rtt_usg ?? 0;
+        const attendantId = existing?.attendant_id ?? anyAttendant?.id;
+        if (!attendantId) {
+          throw new Error("No attendant available for this branch. Assign one first.");
+        }
+        return {
+          branch_id: branchId,
+          shift_id: selectedShift,
+          date: selectedDate,
+          pump_id: pumpId,
+          attendant_id: attendantId,
+          opening_meter: Number(opening) || 0,
+          closing_meter: Number(closing) || 0,
+          rtt_usg: Number(rtt) || 0,
+          unit_price_usd: 0,
+          created_by: user?.id ?? null,
+        };
+      });
+
+      const { error } = await supabase
+        .from("shift_sales_reports")
+        .upsert(rows, { onConflict: "branch_id,pump_id,shift_id,date" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Meter readings saved");
+      qc.invalidateQueries({ queryKey: ["existing-meter-readings"] });
+      qc.invalidateQueries({ queryKey: ["prev-meters-batch"] });
+      setMeters({});
+      setOpenings({});
+      setRtts({});
+    },
+    onError: (err: any) => toast.error(err.message ?? "Failed to save"),
+  });
 
   return (
     <AppLayout title="Meter Readings" subtitle="Record opening and closing meter readings per shift">
