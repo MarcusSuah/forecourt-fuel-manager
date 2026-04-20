@@ -102,9 +102,44 @@ export default function TankDipping() {
     },
   });
 
-  const getOpeningDip = (tankId: string) => {
+  // Pump meter sales for the same shift/date/branch, grouped by tank via tank_pump_assignments
+  const { data: pumpSales } = useQuery({
+    queryKey: ["pump-sales-by-tank", branchId, selectedDate, selectedShift],
+    enabled: !!branchId && !!selectedShift,
+    queryFn: async () => {
+      const { data: sales, error: e1 } = await supabase
+        .from("shift_sales_reports")
+        .select("pump_id, sales_usg")
+        .eq("branch_id", branchId!)
+        .eq("shift_id", selectedShift)
+        .eq("date", selectedDate);
+      if (e1) throw e1;
+      const { data: links, error: e2 } = await supabase
+        .from("tank_pump_assignments")
+        .select("tank_id, pump_id");
+      if (e2) throw e2;
+      const byTank: Record<string, number> = {};
+      (sales ?? []).forEach((s) => {
+        const tankIds = (links ?? []).filter((l) => l.pump_id === s.pump_id).map((l) => l.tank_id);
+        tankIds.forEach((tid) => {
+          byTank[tid] = (byTank[tid] ?? 0) + Number(s.sales_usg ?? 0);
+        });
+      });
+      return byTank;
+    },
+  });
+
+  // Carry-over default for opening dip (previous shift's closing)
+  const getCarryOverOpening = (tankId: string) => {
     const prev = prevDips?.find((d) => d.tank_id === tankId);
     return prev ? Number(prev.physical_level_usg) : 0;
+  };
+
+  const getOpeningDip = (tankId: string) => {
+    if (openings[tankId] !== undefined) return openings[tankId];
+    const saved = currentReadings?.find((r) => r.tank_id === tankId);
+    if (saved) return Number(saved.theoretical_level_usg);
+    return getCarryOverOpening(tankId);
   };
 
   const saveMutation = useMutation({
@@ -129,6 +164,7 @@ export default function TankDipping() {
       toast.success("Dip readings saved");
       queryClient.invalidateQueries({ queryKey: ["current-dips"] });
       setDips({});
+      setOpenings({});
     },
     onError: (err: Error) => toast.error(err.message),
   });
