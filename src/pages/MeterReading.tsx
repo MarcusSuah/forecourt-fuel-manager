@@ -52,11 +52,27 @@ export default function MeterReading() {
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
-    enabled: !isDealer,
     queryFn: async () => {
-      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("branches")
+        .select("id, name, county, location")
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ["system-prefs-meter"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "system_preferences")
+        .maybeSingle();
+      if (error) throw error;
+      return data?.value as { company_name?: string } | null;
     },
   });
 
