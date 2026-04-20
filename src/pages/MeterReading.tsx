@@ -353,6 +353,21 @@ export default function MeterReading() {
 
   return (
     <AppLayout title="Meter Readings" subtitle="Record opening and closing meter readings per shift">
+      {hasUnsavedChanges && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+          <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
+          <div className="flex-1">
+            <span className="font-medium text-foreground">Unsaved changes — </span>
+            <span className="text-muted-foreground">
+              you have edits that haven't been saved yet. Click "Save Readings" before leaving this page.
+            </span>
+          </div>
+          <Button size="sm" onClick={handleSaveClick} disabled={saveMutation.isPending}>
+            <Save className="h-4 w-4 mr-1" />
+            Save now
+          </Button>
+        </div>
+      )}
       <Card className="mb-6">
         <CardContent className="pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
