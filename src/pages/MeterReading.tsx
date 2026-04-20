@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Gauge, RotateCcw, Save } from "lucide-react";
+import { AlertTriangle, Gauge, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -26,6 +26,8 @@ export default function MeterReading() {
   const [meters, setMeters] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
   const [rtts, setRtts] = useState<Record<string, number>>({});
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [attendantSel, setAttendantSel] = useState<Record<string, string>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -53,6 +55,21 @@ export default function MeterReading() {
     enabled: !!branchId,
     queryFn: async () => {
       const { data, error } = await supabase.from("pumps").select("*").eq("branch_id", branchId!).eq("is_active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: branchAttendants } = useQuery({
+    queryKey: ["branch-attendants", branchId],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendants")
+        .select("id, full_name")
+        .eq("branch_id", branchId!)
+        .eq("is_active", true)
+        .order("full_name");
       if (error) throw error;
       return data;
     },
@@ -93,7 +110,7 @@ export default function MeterReading() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id")
+        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id, unit_price_usd")
         .eq("branch_id", branchId!)
         .eq("shift_id", selectedShift)
         .eq("date", selectedDate);
@@ -110,17 +127,8 @@ export default function MeterReading() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!branchId || !selectedShift) throw new Error("Select branch and shift");
-      const pumpIds = Object.keys({ ...meters, ...openings, ...rtts });
+      const pumpIds = Object.keys({ ...meters, ...openings, ...rtts, ...prices, ...attendantSel });
       if (pumpIds.length === 0) throw new Error("No readings to save");
-
-      // Get any attendant assigned to this branch as fallback
-      const { data: anyAttendant } = await supabase
-        .from("attendants")
-        .select("id")
-        .eq("branch_id", branchId)
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
 
       const rows = pumpIds.map((pumpId) => {
         const existing = existingReadings?.find((r) => r.pump_id === pumpId);
@@ -128,9 +136,10 @@ export default function MeterReading() {
           openings[pumpId] ?? existing?.opening_meter ?? getOpeningMeter(pumpId);
         const closing = meters[pumpId] ?? existing?.closing_meter ?? 0;
         const rtt = rtts[pumpId] ?? existing?.rtt_usg ?? 0;
-        const attendantId = existing?.attendant_id ?? anyAttendant?.id;
+        const price = prices[pumpId] ?? existing?.unit_price_usd ?? 0;
+        const attendantId = attendantSel[pumpId] ?? existing?.attendant_id;
         if (!attendantId) {
-          throw new Error("No attendant available for this branch. Assign one first.");
+          throw new Error("Select an attendant for every pump with readings.");
         }
         return {
           branch_id: branchId,
@@ -141,7 +150,7 @@ export default function MeterReading() {
           opening_meter: Number(opening) || 0,
           closing_meter: Number(closing) || 0,
           rtt_usg: Number(rtt) || 0,
-          unit_price_usd: 0,
+          unit_price_usd: Number(price) || 0,
           created_by: user?.id ?? null,
         };
       });
@@ -158,6 +167,8 @@ export default function MeterReading() {
       setMeters({});
       setOpenings({});
       setRtts({});
+      setPrices({});
+      setAttendantSel({});
     },
     onError: (err: any) => toast.error(err.message ?? "Failed to save"),
   });
@@ -214,10 +225,13 @@ export default function MeterReading() {
                 <TableRow>
                   <TableHead>Pump</TableHead>
                   <TableHead>Product</TableHead>
+                  <TableHead>Attendant</TableHead>
                   <TableHead className="text-right">Opening Meter</TableHead>
                   <TableHead className="text-right">Closing Meter</TableHead>
                   <TableHead className="text-right">RTT (USG)</TableHead>
+                  <TableHead className="text-right">Unit Price (USD)</TableHead>
                   <TableHead className="text-right">Volume (USG)</TableHead>
+                  <TableHead className="text-right">Total (USD)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -228,15 +242,47 @@ export default function MeterReading() {
                     openings[pump.id] ?? existing?.opening_meter ?? carryOver;
                   const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
                   const rtt = rtts[pump.id] ?? existing?.rtt_usg ?? 0;
+                  const price = prices[pump.id] ?? existing?.unit_price_usd ?? 0;
+                  const attendantId =
+                    attendantSel[pump.id] ?? existing?.attendant_id ?? "";
                   const volume =
                     closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : null;
+                  const total = volume !== null ? volume * Number(price) : null;
+                  const isBad = volume !== null && volume <= 0;
                   return (
-                    <TableRow key={pump.id}>
-                      <TableCell className="font-medium">{pump.name}</TableCell>
+                    <TableRow
+                      key={pump.id}
+                      className={cn(isBad && "bg-destructive/10 hover:bg-destructive/15")}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {isBad && <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />}
+                          {pump.name}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={cn("text-xs", pump.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
                           {pump.product_type}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={attendantId}
+                          onValueChange={(v) =>
+                            setAttendantSel((prev) => ({ ...prev, [pump.id]: v }))
+                          }
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {branchAttendants?.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.full_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -283,12 +329,27 @@ export default function MeterReading() {
                           placeholder="RTT"
                         />
                       </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="w-24 ml-auto"
+                          value={prices[pump.id] ?? existing?.unit_price_usd ?? 0}
+                          onChange={(e) =>
+                            setPrices((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                          }
+                          placeholder="0.00"
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         {volume !== null && (
-                          <span className={cn("font-bold", volume >= 0 ? "text-foreground" : "text-destructive")}>
+                          <span className={cn("font-bold", isBad ? "text-destructive" : "text-foreground")}>
                             {volume.toLocaleString()}
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {total !== null ? `$${total.toFixed(2)}` : ""}
                       </TableCell>
                     </TableRow>
                   );
