@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { format, subDays, subWeeks, subMonths, subYears, eachDayOfInterval, parseISO } from "date-fns";
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
+import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
 } from "@/components/ui/chart";
@@ -66,7 +67,10 @@ export default function Reports() {
   const { data: branches } = useQuery({
     queryKey: ["branches"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("branches").select("id, name, is_active").order("name");
+      const { data, error } = await supabase
+        .from("branches")
+        .select("id, name, is_active, county, location")
+        .order("name");
       if (error) throw error;
       return data;
     },
