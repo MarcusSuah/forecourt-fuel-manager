@@ -227,6 +227,7 @@ export default function MeterReading() {
   };
 
   const lastSavedAt = (() => {
+    void nowTick; // re-evaluate every minute
     if (!existingReadings || existingReadings.length === 0) return null;
     const max = existingReadings.reduce((acc, r: any) => {
       const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
@@ -234,6 +235,17 @@ export default function MeterReading() {
     }, 0);
     return max ? new Date(max) : null;
   })();
+
+  const formatRelative = (d: Date) => {
+    const diff = Math.max(0, Date.now() - d.getTime());
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "just now";
+    if (min < 60) return `${min} min ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} hr ago`;
+    const day = Math.floor(hr / 24);
+    return `${day} day${day === 1 ? "" : "s"} ago`;
+  };
 
   const buildExportRows = () => {
     const rows: (string | number)[][] = [];
