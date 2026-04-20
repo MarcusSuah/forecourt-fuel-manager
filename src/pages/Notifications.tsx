@@ -4,19 +4,20 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
 import { useDismissedNotifications } from "@/hooks/useDismissedNotifications";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Bell, Droplets, Truck, DollarSign, CheckCircle2, X, Eye, Undo2 } from "lucide-react";
+import { AlertTriangle, Bell, BellOff, Droplets, Truck, DollarSign, CheckCircle2, X, Eye, Undo2, ShieldAlert, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, formatDistanceToNow } from "date-fns";
 
 type Notification = {
   id: string;
-  type: "tank-critical" | "tank-low" | "delivery" | "cash-variance" | "dip-variance";
+  type: "tank-critical" | "tank-low" | "delivery" | "cash-variance" | "dip-variance" | "reconciliation";
   severity: "critical" | "warning" | "info" | "success";
   title: string;
   description: string;
@@ -30,6 +31,7 @@ export default function Notifications() {
   const queryClient = useQueryClient();
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
   const { dismissedKeys, dismiss, dismissMany, restoreAll } = useDismissedNotifications();
+  const { supported: desktopSupported, permission: desktopPermission, enabled: desktopEnabled, setEnabled: setDesktopEnabled, requestPermission, notify: desktopNotify } = useDesktopNotifications();
   const sevenDaysAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
   const today = format(new Date(), "yyyy-MM-dd");
 
