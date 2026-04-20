@@ -601,6 +601,35 @@ export default function MeterReading() {
           </CardContent>
         </Card>
       )}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Bad meter readings detected
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The following pumps have a volume of zero or negative, which usually means
+              the closing meter, opening meter, or RTT was entered incorrectly:
+              <span className="mt-2 block font-medium text-foreground">
+                {getBadPumps().join(", ")}
+              </span>
+              Are you sure you want to save these readings anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Review again</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                saveMutation.mutate();
+              }}
+            >
+              Save anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
