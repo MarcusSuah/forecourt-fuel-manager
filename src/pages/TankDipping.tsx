@@ -12,11 +12,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Settings2, ExternalLink } from "lucide-react";
+import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Settings2, ExternalLink, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { Link } from "react-router-dom";
+
+// Tiny inline sparkline. Negative values are red, non-negative blue.
+function Sparkline({ values, width = 80, height = 24 }: { values: number[]; width?: number; height?: number }) {
+  if (!values || values.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const max = Math.max(...values.map((v) => Math.abs(v)), 1);
+  const stepX = values.length > 1 ? width / (values.length - 1) : width;
+  const points = values
+    .map((v, i) => {
+      const x = i * stepX;
+      const y = height / 2 - (v / max) * (height / 2 - 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const last = values[values.length - 1];
+  const stroke = last < 0 ? "hsl(var(--destructive))" : "hsl(var(--primary))";
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <line x1={0} y1={height / 2} x2={width} y2={height / 2} stroke="hsl(var(--border))" strokeDasharray="2,2" />
+      <polyline fill="none" stroke={stroke} strokeWidth={1.5} points={points} />
+    </svg>
+  );
+}
 
 export default function TankDipping() {
   const { user } = useAuth();
@@ -28,6 +53,7 @@ export default function TankDipping() {
   const [dips, setDips] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
   const [thresholdDraft, setThresholdDraft] = useState<Record<string, string>>({});
+  const [resolveNotes, setResolveNotes] = useState<Record<string, string>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -268,6 +294,65 @@ export default function TankDipping() {
     },
   });
 
+  // 7-day variance trend per tank for sparklines
+  const { data: variance7d } = useQuery({
+    queryKey: ["variance-7d", branchId],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("stock_readings")
+        .select("tank_id, date, variance_usg, created_at")
+        .eq("branch_id", branchId!)
+        .gte("date", since)
+        .order("date", { ascending: true });
+      if (error) throw error;
+      // Aggregate variance by tank+date (sum across shifts on same day), then keep ordered list
+      const byTankDate: Record<string, Record<string, number>> = {};
+      (data ?? []).forEach((r: any) => {
+        const v = Number(r.variance_usg ?? 0);
+        byTankDate[r.tank_id] ??= {};
+        byTankDate[r.tank_id][r.date] = (byTankDate[r.tank_id][r.date] ?? 0) + v;
+      });
+      const result: Record<string, number[]> = {};
+      Object.entries(byTankDate).forEach(([tid, m]) => {
+        const days: number[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = format(subDays(new Date(), i), "yyyy-MM-dd");
+          days.push(m[d] ?? 0);
+        }
+        result[tid] = days;
+      });
+      return result;
+    },
+  });
+
+  // Resolve a reconciliation alert with optional note
+  const resolveMutation = useMutation({
+    mutationFn: async ({ alertId, note }: { alertId: string; note: string }) => {
+      const { error } = await supabase
+        .from("reconciliation_alerts")
+        .update({
+          resolved_at: new Date().toISOString(),
+          resolved_by: user?.id ?? null,
+          resolution_notes: note?.trim() ? note.trim() : null,
+        })
+        .eq("id", alertId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      toast.success("Alert resolved");
+      setResolveNotes((p) => {
+        const { [vars.alertId]: _, ...rest } = p;
+        return rest;
+      });
+      queryClient.invalidateQueries({ queryKey: ["recent-open-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["header-recon-alerts"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   return (
     <AppLayout title="Daily Tank Dipping" subtitle="Record opening and closing dip readings per shift">
       <Card className="mb-6">
@@ -368,6 +453,33 @@ export default function TankDipping() {
                       <div className="flex items-center gap-3 shrink-0">
                         <span className="text-destructive font-semibold">{Number(a.loss_usg).toLocaleString()} USG</span>
                         <Badge variant={a.severity === "critical" ? "destructive" : "secondary"} className="text-[10px] capitalize">{a.severity}</Badge>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-7 px-2">
+                              <Check className="h-3 w-3 mr-1" /> Resolve
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-72" align="end">
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">Resolve alert</p>
+                              <p className="text-xs text-muted-foreground">{a.tanks?.name ?? "Tank"} · {Number(a.loss_usg).toLocaleString()} USG</p>
+                              <Textarea
+                                placeholder="Optional resolution note (root cause, action taken)..."
+                                value={resolveNotes[a.id] ?? ""}
+                                onChange={(e) => setResolveNotes((p) => ({ ...p, [a.id]: e.target.value }))}
+                                className="min-h-[70px] text-xs"
+                              />
+                              <Button
+                                size="sm"
+                                className="w-full"
+                                disabled={resolveMutation.isPending}
+                                onClick={() => resolveMutation.mutate({ alertId: a.id, note: resolveNotes[a.id] ?? "" })}
+                              >
+                                Mark resolved
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </li>
                   ))}
@@ -397,6 +509,7 @@ export default function TankDipping() {
                   <TableHead>Closing Dip (USG)</TableHead>
                   <TableHead className="text-right">Sales (USG)</TableHead>
                   <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="text-right">7-day trend</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -516,6 +629,11 @@ export default function TankDipping() {
                             )}
                           </div>
                         )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end" title="Daily variance USG (last 7 days)">
+                          <Sparkline values={variance7d?.[tank.id] ?? []} />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

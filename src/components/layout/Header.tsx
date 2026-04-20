@@ -65,12 +65,33 @@ export function Header({ title, subtitle }: HeaderProps) {
     refetchInterval: 30000,
   });
 
+  // Open (unresolved) reconciliation alerts → bell badge + popover list
+  const { data: reconAlerts } = useQuery({
+    queryKey: ["header-recon-alerts", dealerBranchId],
+    queryFn: async () => {
+      let q = supabase
+        .from("reconciliation_alerts")
+        .select("id, created_at, loss_usg, threshold_usg, severity, branch_id, tanks(name, product_type), branches(name)")
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30000,
+  });
+
   // Real-time tank updates so the bell badge reflects changes instantly
   useEffect(() => {
     const channel = supabase
       .channel("header-tanks-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "tanks" }, () => {
         queryClient.invalidateQueries({ queryKey: ["header-tank-alerts"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "reconciliation_alerts" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["header-recon-alerts"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -105,7 +126,8 @@ export function Header({ title, subtitle }: HeaderProps) {
     const key = t.pct < 20 ? `tank-crit-${t.id}` : `tank-low-${t.id}`;
     return !dismissedKeys.has(key);
   });
-  const alertCount = visibleAlerts.length;
+  const visibleRecon = (reconAlerts ?? []).filter((a: any) => !dismissedKeys.has(`recon-${a.id}`));
+  const alertCount = visibleAlerts.length + visibleRecon.length;
 
   return (
     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
@@ -186,7 +208,32 @@ export function Header({ title, subtitle }: HeaderProps) {
                 {alertCount === 0 ? (
                   <div className="p-6 text-center text-sm text-muted-foreground">All systems normal ✓</div>
                 ) : (
-                  visibleAlerts.map(t => {
+                  <>
+                  {visibleRecon.map((a: any) => {
+                    const key = `recon-${a.id}`;
+                    return (
+                      <div key={a.id} className="flex items-start gap-2 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors">
+                        <div className="h-2 w-2 rounded-full mt-1.5 shrink-0 bg-destructive animate-pulse" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">Critical variance · {a.tanks?.name ?? "Tank"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.branches?.name ?? ""} · Loss {Math.abs(Number(a.loss_usg)).toFixed(1)} USG (±{Number(a.threshold_usg).toLocaleString()})
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] shrink-0 border-destructive text-destructive">RECON</Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
+                          title="Dismiss"
+                          onClick={(e) => { e.stopPropagation(); dismiss({ key, type: "reconciliation" }); }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                  {visibleAlerts.map(t => {
                     const key = t.pct < 20 ? `tank-crit-${t.id}` : `tank-low-${t.id}`;
                     const type = t.pct < 20 ? "tank-critical" : "tank-low";
                     return (
@@ -210,7 +257,8 @@ export function Header({ title, subtitle }: HeaderProps) {
                         </Button>
                       </div>
                     );
-                  })
+                  })}
+                  </>
                 )}
               </div>
               <div className="border-t border-border p-2">
