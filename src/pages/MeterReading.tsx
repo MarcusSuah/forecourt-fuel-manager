@@ -321,6 +321,7 @@ export default function MeterReading() {
                 {(() => {
                   let totalVolume = 0;
                   let totalSales = 0;
+                  let pmsVolume = 0, pmsSales = 0, agoVolume = 0, agoSales = 0;
                   const rows = (pumps ?? []).map((pump) => {
                   const existing = existingReadings?.find((r) => r.pump_id === pump.id);
                   const carryOver = getOpeningMeter(pump.id);
@@ -341,6 +342,13 @@ export default function MeterReading() {
                   if (volume !== null && !isBad) {
                     totalVolume += volume;
                     totalSales += total ?? 0;
+                    if (pump.product_type === "PMS") {
+                      pmsVolume += volume;
+                      pmsSales += total ?? 0;
+                    } else {
+                      agoVolume += volume;
+                      agoSales += total ?? 0;
+                    }
                   }
                   return (
                     <TableRow
@@ -459,6 +467,30 @@ export default function MeterReading() {
                   return (
                     <>
                       {rows}
+                      <TableRow className="bg-muted/20">
+                        <TableCell colSpan={6} className="text-right text-fuel-pms font-medium">
+                          PMS Subtotal
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right text-fuel-pms">
+                          {pmsVolume.toLocaleString()} USG
+                        </TableCell>
+                        <TableCell className="text-right text-fuel-pms">
+                          ${pmsSales.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/20">
+                        <TableCell colSpan={6} className="text-right text-fuel-ago font-medium">
+                          AGO Subtotal
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right text-fuel-ago">
+                          {agoVolume.toLocaleString()} USG
+                        </TableCell>
+                        <TableCell className="text-right text-fuel-ago">
+                          ${agoSales.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
                       <TableRow data-totals className="font-semibold bg-muted/40">
                         <TableCell colSpan={6} className="text-right">
                           Shift Totals
