@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Gauge, RotateCcw, Save } from "lucide-react";
+import { AlertTriangle, Gauge, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -26,6 +26,8 @@ export default function MeterReading() {
   const [meters, setMeters] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
   const [rtts, setRtts] = useState<Record<string, number>>({});
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [attendantSel, setAttendantSel] = useState<Record<string, string>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -53,6 +55,21 @@ export default function MeterReading() {
     enabled: !!branchId,
     queryFn: async () => {
       const { data, error } = await supabase.from("pumps").select("*").eq("branch_id", branchId!).eq("is_active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: branchAttendants } = useQuery({
+    queryKey: ["branch-attendants", branchId],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendants")
+        .select("id, full_name")
+        .eq("branch_id", branchId!)
+        .eq("is_active", true)
+        .order("full_name");
       if (error) throw error;
       return data;
     },
@@ -93,7 +110,7 @@ export default function MeterReading() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id")
+        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id, unit_price_usd")
         .eq("branch_id", branchId!)
         .eq("shift_id", selectedShift)
         .eq("date", selectedDate);
