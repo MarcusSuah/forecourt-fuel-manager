@@ -321,6 +321,30 @@ export type Database = {
           },
         ]
       }
+      dismissed_notifications: {
+        Row: {
+          dismissed_at: string
+          id: string
+          notification_key: string
+          notification_type: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          id?: string
+          notification_key: string
+          notification_type: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          id?: string
+          notification_key?: string
+          notification_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           branch_id: string | null
