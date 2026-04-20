@@ -254,6 +254,7 @@ export default function ShiftStockReport() {
                     ? t.pumps.map((p) => [
                         t.tankName, t.productType,
                         t.openingDip.toLocaleString(), t.closingDip.toLocaleString(),
+                        t.deliveries.toLocaleString(),
                         t.tankSales.toLocaleString(),
                         p.name,
                         Number(p.openingMeter).toLocaleString(),
@@ -261,16 +262,17 @@ export default function ShiftStockReport() {
                         p.meterSales.toLocaleString(),
                         `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`,
                       ])
-                    : [[t.tankName, t.productType, t.openingDip.toLocaleString(), t.closingDip.toLocaleString(), t.tankSales.toLocaleString(), "—", "0", "0", "0", `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`]]
+                    : [[t.tankName, t.productType, t.openingDip.toLocaleString(), t.closingDip.toLocaleString(), t.deliveries.toLocaleString(), t.tankSales.toLocaleString(), "—", "0", "0", "0", `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`]]
                 );
                 const totalVariance = reportData.reduce((s, t) => s + t.variance, 0);
                 exportTableToPDF(
                   "Shift Stock Report",
                   `${shiftName} Shift • ${format(new Date(selectedDate), "MMMM dd, yyyy")}`,
-                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
+                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Deliveries", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
                   rows,
                   [
                     { label: "Tanks", value: String(reportData.length) },
+                    { label: "Total Deliveries", value: `${reportData.reduce((s, t) => s + t.deliveries, 0).toLocaleString()} USG` },
                     { label: "Total Tank Sales", value: `${reportData.reduce((s, t) => s + t.tankSales, 0).toLocaleString()} USG` },
                     { label: "Total Meter Sales", value: `${reportData.reduce((s, t) => s + t.totalMeterSales, 0).toLocaleString()} USG` },
                     { label: "Net Variance", value: `${totalVariance >= 0 ? "+" : ""}${totalVariance.toLocaleString()} USG` },
