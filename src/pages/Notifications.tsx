@@ -331,6 +331,23 @@ export default function Notifications() {
               )}
             </CardTitle>
             <div className="flex items-center gap-1.5">
+              {desktopSupported && (
+                desktopPermission !== "granted" ? (
+                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => requestPermission()}>
+                    <Monitor className="h-3.5 w-3.5 mr-1" /> Enable desktop alerts
+                  </Button>
+                ) : (
+                  <Button
+                    variant={desktopEnabled ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setDesktopEnabled(!desktopEnabled)}
+                  >
+                    {desktopEnabled ? <Bell className="h-3.5 w-3.5 mr-1" /> : <BellOff className="h-3.5 w-3.5 mr-1" />}
+                    Desktop {desktopEnabled ? "on" : "off"}
+                  </Button>
+                )
+              )}
               {notifications.length > 0 && (
                 <Button
                   variant="outline"
