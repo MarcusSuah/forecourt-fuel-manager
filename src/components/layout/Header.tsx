@@ -126,7 +126,8 @@ export function Header({ title, subtitle }: HeaderProps) {
     const key = t.pct < 20 ? `tank-crit-${t.id}` : `tank-low-${t.id}`;
     return !dismissedKeys.has(key);
   });
-  const alertCount = visibleAlerts.length;
+  const visibleRecon = (reconAlerts ?? []).filter((a: any) => !dismissedKeys.has(`recon-${a.id}`));
+  const alertCount = visibleAlerts.length + visibleRecon.length;
 
   return (
     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
