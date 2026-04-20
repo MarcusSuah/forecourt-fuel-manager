@@ -1143,6 +1143,57 @@ export type Database = {
           },
         ]
       }
+      sync_queue: {
+        Row: {
+          attempts: number
+          client_entry_id: string
+          created_at: string
+          id: string
+          label: string
+          last_error: string | null
+          payload: Json
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          target_table: string
+          updated_at: string
+          user_email: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          client_entry_id: string
+          created_at?: string
+          id?: string
+          label?: string
+          last_error?: string | null
+          payload?: Json
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          target_table: string
+          updated_at?: string
+          user_email?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          client_entry_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+          last_error?: string | null
+          payload?: Json
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          target_table?: string
+          updated_at?: string
+          user_email?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           description: string | null
