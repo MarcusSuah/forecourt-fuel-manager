@@ -339,6 +339,42 @@ export default function TankDipping() {
               </CardContent>
             </Card>
           </div>
+          {recentAlerts && recentAlerts.length > 0 && (
+            <Card className="mb-4 border-destructive/30">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    Recent Open Alerts ({recentAlerts.length})
+                  </CardTitle>
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/reconciliation-alerts">
+                      View all <ExternalLink className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ul className="divide-y">
+                  {recentAlerts.map((a: any) => (
+                    <li key={a.id} className="py-2 flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge variant="outline" className={cn("text-[10px]", a.tanks?.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
+                          {a.tanks?.product_type ?? "—"}
+                        </Badge>
+                        <span className="font-medium truncate">{a.tanks?.name ?? "Tank"}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(a.created_at), "MMM d, HH:mm")}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-destructive font-semibold">{Number(a.loss_usg).toLocaleString()} USG</span>
+                        <Badge variant={a.severity === "critical" ? "destructive" : "secondary"} className="text-[10px] capitalize">{a.severity}</Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
           <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
