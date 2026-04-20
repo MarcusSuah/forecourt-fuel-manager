@@ -4,19 +4,20 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
 import { useDismissedNotifications } from "@/hooks/useDismissedNotifications";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Bell, Droplets, Truck, DollarSign, CheckCircle2, X, Eye, Undo2 } from "lucide-react";
+import { AlertTriangle, Bell, BellOff, Droplets, Truck, DollarSign, CheckCircle2, X, Eye, Undo2, ShieldAlert, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, formatDistanceToNow } from "date-fns";
 
 type Notification = {
   id: string;
-  type: "tank-critical" | "tank-low" | "delivery" | "cash-variance" | "dip-variance";
+  type: "tank-critical" | "tank-low" | "delivery" | "cash-variance" | "dip-variance" | "reconciliation";
   severity: "critical" | "warning" | "info" | "success";
   title: string;
   description: string;
@@ -30,6 +31,7 @@ export default function Notifications() {
   const queryClient = useQueryClient();
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
   const { dismissedKeys, dismiss, dismissMany, restoreAll } = useDismissedNotifications();
+  const { supported: desktopSupported, permission: desktopPermission, enabled: desktopEnabled, setEnabled: setDesktopEnabled, requestPermission, notify: desktopNotify } = useDesktopNotifications();
   const sevenDaysAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -84,6 +86,21 @@ export default function Notifications() {
     },
   });
 
+  const { data: reconAlerts } = useQuery({
+    queryKey: ["notifs-recon-alerts", dealerBranchId],
+    queryFn: async () => {
+      let q = supabase
+        .from("reconciliation_alerts")
+        .select("id, tank_id, branch_id, loss_usg, threshold_usg, severity, created_at, tanks(name, product_type), branches(name)")
+        .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .order("created_at", { ascending: false });
+      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   // Realtime: refresh notifications when underlying tables change
   useEffect(() => {
     const channel = supabase
@@ -100,9 +117,21 @@ export default function Notifications() {
       .on("postgres_changes", { event: "*", schema: "public", table: "shift_sales_reports" }, () => {
         queryClient.invalidateQueries({ queryKey: ["notifs-cash-variance"] });
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reconciliation_alerts" }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-recon-alerts"] });
+        const row: any = payload.new;
+        if (row && (!isDealer || row.branch_id === dealerBranchId)) {
+          desktopNotify("🚨 Critical Tank Loss Detected", {
+            tag: `recon-${row.id}`,
+            body: `Loss of ${Math.abs(Number(row.loss_usg)).toFixed(1)} USG at branch. Click to investigate.`,
+            requireInteraction: true,
+            onClick: () => navigate("/notifications"),
+          });
+        }
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [queryClient, desktopNotify, isDealer, dealerBranchId, navigate]);
 
   const notifications = useMemo<Notification[]>(() => {
     const list: Notification[] = [];
@@ -150,6 +179,19 @@ export default function Notifications() {
       });
     });
 
+    (reconAlerts ?? []).forEach((r: any) => {
+      list.push({
+        id: `recon-${r.id}`,
+        type: "reconciliation",
+        severity: "critical",
+        title: `🚨 Critical loss: ${(r.tanks as any)?.name ?? "Tank"}`,
+        description: `Loss of ${Math.abs(Number(r.loss_usg)).toFixed(1)} USG (threshold ${r.threshold_usg} USG). Supervisors notified.`,
+        branchName: (r.branches as any)?.name ?? "Unknown",
+        timestamp: r.created_at,
+        link: "/tanks",
+      });
+    });
+
     if (cashSales) {
       // Group by branch
       const byBranch = new Map<string, { name: string; cash: number; sales: number }>();
@@ -188,7 +230,7 @@ export default function Notifications() {
       if (sev[a.severity] !== sev[b.severity]) return sev[a.severity] - sev[b.severity];
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
-  }, [tanks, deliveries, cashSales, thresholds, dismissedKeys]);
+  }, [tanks, deliveries, cashSales, reconAlerts, thresholds, dismissedKeys]);
 
   const isLoading = tanksLoading || delsLoading;
 
@@ -198,6 +240,7 @@ export default function Notifications() {
     if (type === "tanks") return notifications.filter(n => n.type === "tank-critical" || n.type === "tank-low");
     if (type === "deliveries") return notifications.filter(n => n.type === "delivery");
     if (type === "cash") return notifications.filter(n => n.type === "cash-variance");
+    if (type === "reconciliation") return notifications.filter(n => n.type === "reconciliation");
     return notifications;
   };
 
@@ -225,6 +268,7 @@ export default function Notifications() {
         {items.map((n) => {
           const Icon = n.type === "delivery" ? Truck
             : n.type === "cash-variance" ? DollarSign
+            : n.type === "reconciliation" ? ShieldAlert
             : n.type.startsWith("tank") ? Droplets
             : AlertTriangle;
           const tone = n.severity === "critical" ? "bg-destructive/10 border-destructive/30 text-destructive"
@@ -288,6 +332,23 @@ export default function Notifications() {
               )}
             </CardTitle>
             <div className="flex items-center gap-1.5">
+              {desktopSupported && (
+                desktopPermission !== "granted" ? (
+                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => requestPermission()}>
+                    <Monitor className="h-3.5 w-3.5 mr-1" /> Enable desktop alerts
+                  </Button>
+                ) : (
+                  <Button
+                    variant={desktopEnabled ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setDesktopEnabled(!desktopEnabled)}
+                  >
+                    {desktopEnabled ? <Bell className="h-3.5 w-3.5 mr-1" /> : <BellOff className="h-3.5 w-3.5 mr-1" />}
+                    Desktop {desktopEnabled ? "on" : "off"}
+                  </Button>
+                )
+              )}
               {notifications.length > 0 && (
                 <Button
                   variant="outline"
@@ -319,12 +380,14 @@ export default function Notifications() {
               <TabsTrigger value="tanks">Tanks ({filterByType("tanks").length})</TabsTrigger>
               <TabsTrigger value="deliveries">Deliveries ({filterByType("deliveries").length})</TabsTrigger>
               <TabsTrigger value="cash">Cash ({filterByType("cash").length})</TabsTrigger>
+              <TabsTrigger value="reconciliation">Reconciliation ({filterByType("reconciliation").length})</TabsTrigger>
             </TabsList>
             <TabsContent value="all">{renderList(notifications)}</TabsContent>
             <TabsContent value="alerts">{renderList(filterByType("alerts"))}</TabsContent>
             <TabsContent value="tanks">{renderList(filterByType("tanks"))}</TabsContent>
             <TabsContent value="deliveries">{renderList(filterByType("deliveries"))}</TabsContent>
             <TabsContent value="cash">{renderList(filterByType("cash"))}</TabsContent>
+            <TabsContent value="reconciliation">{renderList(filterByType("reconciliation"))}</TabsContent>
           </Tabs>
         </CardContent>
       </Card>

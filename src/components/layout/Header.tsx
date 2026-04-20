@@ -14,7 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useDismissedNotifications } from "@/hooks/useDismissedNotifications";
-import { useEffect } from "react";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
+import { useEffect, useRef } from "react";
 
 interface HeaderProps {
   title: string;
@@ -27,6 +28,8 @@ export function Header({ title, subtitle }: HeaderProps) {
   const { shifts, selectedShift, setSelectedShift } = useShiftSelect();
   const queryClient = useQueryClient();
   const { dismissedKeys, dismiss } = useDismissedNotifications();
+  const { notify } = useDesktopNotifications();
+  const seenCriticalIds = useRef<Set<string>>(new Set());
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     year: "numeric",
@@ -72,6 +75,30 @@ export function Header({ title, subtitle }: HeaderProps) {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
+
+  // Realtime listener for newly logged Critical reconciliation alerts → desktop notification
+  useEffect(() => {
+    const channel = supabase
+      .channel("recon-alerts-desktop")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "reconciliation_alerts" },
+        (payload) => {
+          const row: any = payload.new;
+          if (!row || seenCriticalIds.current.has(row.id)) return;
+          if (isDealer && dealerBranchId && row.branch_id !== dealerBranchId) return;
+          seenCriticalIds.current.add(row.id);
+          notify("🚨 Critical Tank Loss Detected", {
+            tag: `recon-${row.id}`,
+            body: `Loss of ${Math.abs(Number(row.loss_usg)).toFixed(1)} USG (threshold ${row.threshold_usg}). Click to investigate.`,
+            requireInteraction: true,
+            onClick: () => { window.location.href = "/notifications"; },
+          });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [notify, isDealer, dealerBranchId]);
 
   // Hide alerts the user has already dismissed on the Notifications page
   const visibleAlerts = (tankAlerts ?? []).filter((t) => {

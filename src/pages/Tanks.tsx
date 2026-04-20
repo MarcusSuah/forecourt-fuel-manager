@@ -409,6 +409,10 @@ export default function Tanks() {
           tankId={historyTank.id}
           tankName={historyTank.name}
           capacity={Number(historyTank.capacity_usg)}
+          branchId={historyTank.branch_id}
+          branchName={(historyTank.branches as any)?.name}
+          productType={historyTank.product_type}
+          initialThreshold={Number(historyTank.reconciliation_threshold_usg ?? 50)}
         />
       )}
     </AppLayout>

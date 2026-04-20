@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus, ShieldAlert, AlertTriangle } from "lucide-react";
+import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus, ShieldAlert, AlertTriangle, Save, Bell } from "lucide-react";
 import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCSV } from "@/lib/csv-export";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from "recharts";
@@ -23,6 +25,10 @@ interface StockHistoryDialogProps {
   tankId: string;
   tankName: string;
   capacity: number;
+  branchId?: string;
+  branchName?: string;
+  productType?: string;
+  initialThreshold?: number;
 }
 
 type HistoryEvent = {
@@ -35,10 +41,37 @@ type HistoryEvent = {
   resultingLevel: number;
 };
 
-export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capacity }: StockHistoryDialogProps) {
+export function StockHistoryDialog({
+  open, onOpenChange, tankId, tankName, capacity,
+  branchId, branchName, productType, initialThreshold,
+}: StockHistoryDialogProps) {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [reconThreshold, setReconThreshold] = useState<number>(50);
+  const [reconThreshold, setReconThreshold] = useState<number>(initialThreshold ?? 50);
+  const [alertedKeys, setAlertedKeys] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canEditThreshold = user?.role === "admin" || user?.role === "supervisor";
+
+  // Sync threshold prop -> state when reopened with a different tank
+  useEffect(() => {
+    if (typeof initialThreshold === "number") setReconThreshold(initialThreshold);
+  }, [initialThreshold, tankId]);
+
+  const saveThresholdMutation = useMutation({
+    mutationFn: async (newVal: number) => {
+      const { error } = await supabase
+        .from("tanks")
+        .update({ reconciliation_threshold_usg: newVal })
+        .eq("id", tankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Threshold saved for this tank");
+      queryClient.invalidateQueries({ queryKey: ["tanks"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["tank-stock-history", tankId],
@@ -125,6 +158,43 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
   }, [filteredAsc]);
 
   const filteredDesc = useMemo(() => [...filteredWithVariance].reverse(), [filteredWithVariance]);
+
+  // Auto-trigger Critical alerts: any dip whose loss > 2× threshold
+  useEffect(() => {
+    if (!open || !branchId || !branchName || !productType) return;
+    const criticals = filteredWithVariance.filter(
+      (e) => e.type === "dip" && e.dipVariance !== null && e.dipVariance < -reconThreshold * 2
+    );
+    criticals.forEach((ev) => {
+      const key = `${ev.id}-${reconThreshold}`;
+      if (alertedKeys.has(key)) return;
+      const lossUsg = ev.dipVariance ?? 0;
+      // Only alert for events from the last 24h to avoid retroactive spam
+      const ageMs = Date.now() - new Date(ev.timestamp).getTime();
+      if (ageMs > 24 * 60 * 60 * 1000) {
+        setAlertedKeys((prev) => new Set(prev).add(key));
+        return;
+      }
+      setAlertedKeys((prev) => new Set(prev).add(key));
+      supabase.functions.invoke("send-reconciliation-alert", {
+        body: {
+          tank_id: tankId,
+          branch_id: branchId,
+          tank_name: tankName,
+          branch_name: branchName,
+          product_type: productType,
+          loss_usg: lossUsg,
+          threshold_usg: reconThreshold,
+          stock_reading_id: ev.id.replace(/^dip-/, ""),
+          dip_date: ev.date,
+        },
+      }).then(({ error }) => {
+        if (!error) {
+          toast.warning(`Critical alert dispatched for ${tankName}`);
+        }
+      });
+    });
+  }, [open, filteredWithVariance, reconThreshold, branchId, branchName, productType, tankId, tankName, alertedKeys]);
 
   // Summary stats for the selected period
   const summary = useMemo(() => {
@@ -364,6 +434,22 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
                         </Button>
                       ))}
                     </div>
+                    {canEditThreshold && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-9 ml-auto"
+                        onClick={() => saveThresholdMutation.mutate(reconThreshold)}
+                        disabled={saveThresholdMutation.isPending || reconThreshold === initialThreshold}
+                        title="Save this threshold for this tank (visible to all users)"
+                      >
+                        <Save className="h-3.5 w-3.5 mr-1" /> Save for tank
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 text-[11px] text-muted-foreground">
+                    <Bell className="h-3 w-3" />
+                    Critical events (loss &gt; {reconThreshold * 2} USG) auto-notify Admins, Supervisors, and the branch Dealer by email and SMS.
                   </div>
                 </div>
 
