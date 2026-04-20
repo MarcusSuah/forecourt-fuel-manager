@@ -1,15 +1,16 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
+import { useDismissedNotifications } from "@/hooks/useDismissedNotifications";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Bell, Droplets, Truck, DollarSign, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Bell, Droplets, Truck, DollarSign, CheckCircle2, X, Eye, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, formatDistanceToNow } from "date-fns";
 
