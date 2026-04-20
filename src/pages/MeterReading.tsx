@@ -370,7 +370,7 @@ export default function MeterReading() {
               </Button>
               {lastSavedAt && (
                 <span className="text-xs text-muted-foreground">
-                  Last saved at {format(lastSavedAt, "HH:mm")}
+                  Last saved {formatRelative(lastSavedAt)}
                 </span>
               )}
               <Button
