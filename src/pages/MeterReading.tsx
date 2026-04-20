@@ -19,6 +19,7 @@ export default function MeterReading() {
   const [selectedShift, setSelectedShift] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [meters, setMeters] = useState<Record<string, number>>({});
+  const [openings, setOpenings] = useState<Record<string, number>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -150,7 +151,9 @@ export default function MeterReading() {
               <TableBody>
                 {(pumps ?? []).map((pump) => {
                   const existing = existingReadings?.find((r) => r.pump_id === pump.id);
-                  const opening = existing?.opening_meter ?? getOpeningMeter(pump.id);
+                  const carryOver = getOpeningMeter(pump.id);
+                  const opening =
+                    openings[pump.id] ?? existing?.opening_meter ?? carryOver;
                   const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
                   const volume = closing !== "" ? Number(closing) - Number(opening) : null;
                   return (
@@ -161,7 +164,17 @@ export default function MeterReading() {
                           {pump.product_type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-medium">{Number(opening).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          className="w-32 ml-auto"
+                          value={openings[pump.id] ?? existing?.opening_meter ?? carryOver}
+                          onChange={(e) =>
+                            setOpenings((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                          }
+                          placeholder="Opening"
+                        />
+                      </TableCell>
                       <TableCell>
                         <Input
                           type="number"
