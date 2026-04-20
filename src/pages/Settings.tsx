@@ -18,8 +18,10 @@ import {
 import { toast } from "sonner";
 import {
   Settings as SettingsIcon, DollarSign, Droplets, Clock, Building2, Save, RefreshCw, Shield,
+  Upload, Image as ImageIcon, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { invalidatePDFHeaderCache } from "@/lib/pdf-header-info";
 
 interface SettingRow {
   id: string;
@@ -71,6 +73,8 @@ export default function Settings() {
   const [primaryCurrency, setPrimaryCurrency] = useState("USD");
   const [secondaryCurrency, setSecondaryCurrency] = useState("LRD");
   const [dateFormat, setDateFormat] = useState("yyyy-MM-dd");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Populate form when data loads
   useEffect(() => {
@@ -93,6 +97,7 @@ export default function Settings() {
       setPrimaryCurrency(prefSetting.value?.currency_primary || "USD");
       setSecondaryCurrency(prefSetting.value?.currency_secondary || "LRD");
       setDateFormat(prefSetting.value?.date_format || "yyyy-MM-dd");
+      setLogoUrl(prefSetting.value?.logo_url || "");
     }
   }, [prefSetting]);
 
@@ -134,8 +139,36 @@ export default function Settings() {
     if (!companyName.trim()) { toast.error("Company name required"); return; }
     updateSettingMutation.mutate({
       key: "system_preferences",
-      value: { company_name: companyName, currency_primary: primaryCurrency, currency_secondary: secondaryCurrency, date_format: dateFormat },
+      value: {
+        company_name: companyName,
+        currency_primary: primaryCurrency,
+        currency_secondary: secondaryCurrency,
+        date_format: dateFormat,
+        logo_url: logoUrl || undefined,
+      },
     });
+    invalidatePDFHeaderCache();
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be under 2MB"); return; }
+    if (!file.type.startsWith("image/")) { toast.error("Select an image file"); return; }
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("employee-photos")
+        .upload(path, file, { upsert: true, cacheControl: "3600" });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("employee-photos").getPublicUrl(path);
+      setLogoUrl(data.publicUrl);
+      toast.success("Logo uploaded — click Save Preferences to apply");
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   if (!isAdmin) {
@@ -285,6 +318,51 @@ export default function Settings() {
             <div className="space-y-2">
               <Label>Company Name</Label>
               <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Forecourt Management System" />
+            </div>
+            <div className="space-y-2">
+              <Label>Company Logo (used in PDF reports)</Label>
+              <div className="flex items-center gap-3">
+                <div className="h-16 w-16 rounded-lg border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadingLogo}
+                    onClick={() => document.getElementById("logo-upload-input")?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    {uploadingLogo ? "Uploading..." : logoUrl ? "Replace" : "Upload Logo"}
+                  </Button>
+                  {logoUrl && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLogoUrl("")}
+                      title="Remove logo"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <input
+                    id="logo-upload-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleLogoUpload(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">PNG or JPG, recommended 200×200px, max 2MB.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

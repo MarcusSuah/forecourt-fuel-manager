@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
+import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,18 +64,6 @@ export default function MeterReading() {
     },
   });
 
-  const { data: companySettings } = useQuery({
-    queryKey: ["system-prefs-meter"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "system_preferences")
-        .maybeSingle();
-      if (error) throw error;
-      return data?.value as { company_name?: string } | null;
-    },
-  });
 
   const { data: shifts } = useQuery({
     queryKey: ["shifts"],
@@ -203,6 +192,32 @@ export default function MeterReading() {
     );
   };
 
+  const hasUnsavedChanges = (pumps ?? []).some((pump) => {
+    const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+    const dirty = (a: any, b: any) =>
+      a !== undefined && a !== null && Number(a) !== Number(b ?? 0);
+    const attendantDirty =
+      attendantSel[pump.id] !== undefined &&
+      attendantSel[pump.id] !== (ex?.attendant_id ?? "");
+    return (
+      dirty(openings[pump.id], ex?.opening_meter) ||
+      dirty(meters[pump.id], ex?.closing_meter) ||
+      dirty(rtts[pump.id], ex?.rtt_usg) ||
+      dirty(prices[pump.id], ex?.unit_price_usd) ||
+      attendantDirty
+    );
+  });
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   // Compute current bad-row pump names (volume <= 0 from inputs or persisted readings).
   const getBadPumps = (): string[] => {
     const bad: string[] = [];
@@ -326,6 +341,21 @@ export default function MeterReading() {
 
   return (
     <AppLayout title="Meter Readings" subtitle="Record opening and closing meter readings per shift">
+      {hasUnsavedChanges && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+          <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
+          <div className="flex-1">
+            <span className="font-medium text-foreground">Unsaved changes — </span>
+            <span className="text-muted-foreground">
+              you have edits that haven't been saved yet. Click "Save Readings" before leaving this page.
+            </span>
+          </div>
+          <Button size="sm" onClick={handleSaveClick} disabled={saveMutation.isPending}>
+            <Save className="h-4 w-4 mr-1" />
+            Save now
+          </Button>
+        </div>
+      )}
       <Card className="mb-6">
         <CardContent className="pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -405,7 +435,7 @@ export default function MeterReading() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
                   const headers = [
                     "Pump", "Product", "Attendant",
                     "Opening", "Closing", "RTT (USG)",
@@ -420,10 +450,7 @@ export default function MeterReading() {
                   stringRows.push(["Shift Total", "", "", "", "", "", "", tV.toLocaleString(), `$${tS.toFixed(2)}`]);
                   const shiftName = shifts?.find((s) => s.id === selectedShift)?.name ?? "";
                   const branchRecord = branches?.find((b) => b.id === branchId);
-                  const branchName = branchRecord?.name ?? "";
-                  const branchAddress = [branchRecord?.location, branchRecord?.county]
-                    .filter(Boolean)
-                    .join(", ");
+                  const headerInfo = await buildPDFHeaderInfo(branchRecord);
                   exportTableToPDF(
                     "Meter Readings Report",
                     `${shiftName} Shift • ${selectedDate}`,
@@ -435,11 +462,7 @@ export default function MeterReading() {
                       { label: "PMS Volume", value: `${pmsV.toLocaleString()} USG` },
                       { label: "AGO Volume", value: `${agoV.toLocaleString()} USG` },
                     ],
-                    {
-                      companyName: companySettings?.company_name || "Forecourt Management System",
-                      branchName,
-                      branchAddress,
-                    },
+                    headerInfo,
                   );
                 }}
               >

@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Save, Trash2, Wallet, DollarSign, Banknote, Download } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
+import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -51,7 +53,11 @@ export default function CashReports() {
   const { data: branches } = useQuery({
     queryKey: ["branches"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("branches")
+        .select("id, name, county, location")
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -293,6 +299,32 @@ export default function CashReports() {
                   todaysDeposits.map(d => [(d.attendants as any)?.full_name || "—", d.deposit_type, Number(d.amount), d.deposit_type === "LRD" ? Number(d.exchange_rate) : "—", Number(d.amount_usd).toFixed(2), d.notes || ""])
                 );
               }}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+              <Button variant="outline" size="sm" onClick={async () => {
+                if (!todaysDeposits) return;
+                const branch = branches?.find((b) => b.id === globalBranch);
+                const shiftName = shifts?.find((s) => s.id === globalShift)?.name ?? "";
+                const headerInfo = await buildPDFHeaderInfo(branch);
+                exportTableToPDF(
+                  "Cash Deposits Report",
+                  `${shiftName} Shift • ${format(new Date(date), "MMMM dd, yyyy")}`,
+                  ["Attendant", "Type", "Amount", "Rate", "USD Equiv.", "Notes"],
+                  todaysDeposits.map((d) => [
+                    (d.attendants as any)?.full_name || "—",
+                    d.deposit_type,
+                    String(Number(d.amount).toLocaleString()),
+                    d.deposit_type === "LRD" ? String(Number(d.exchange_rate)) : "—",
+                    `$${Number(d.amount_usd).toFixed(2)}`,
+                    d.notes || "",
+                  ]),
+                  [
+                    { label: "LRD Cash", value: `L$${submittedTotals.lrd.toLocaleString()}` },
+                    { label: "USD Cash", value: `$${submittedTotals.usd.toLocaleString()}` },
+                    { label: "Card Sales", value: `$${submittedTotals.card.toLocaleString()}` },
+                    { label: "Total (USD)", value: `$${submittedTotals.totalUsd.toFixed(2)}` },
+                  ],
+                  headerInfo,
+                );
+              }}><Download className="h-4 w-4 mr-1" /> PDF</Button>
             </div>
           </CardHeader>
           <CardContent>
