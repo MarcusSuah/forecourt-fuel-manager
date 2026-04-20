@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
+import { enqueue as enqueueSync, isOffline } from "@/lib/sync-queue";
 
 const MAX_PUMPS_PER_ATTENDANT = 4;
 
@@ -252,11 +253,34 @@ export default function SalesEntry() {
         unit_price_usd: parseFloat(e.unit_price_usd) || 0,
         created_by: user?.id,
       }));
-      const { error } = await supabase.from("shift_sales_reports").insert(inserts);
-      if (error) throw error;
+      const branchName = branches?.find(b => b.id === globalBranch)?.name ?? "branch";
+      const attName = selectedAttendantData?.full_name ?? "attendant";
+      const label = `Sales: ${inserts.length} pump${inserts.length === 1 ? "" : "s"} · ${attName} · ${branchName}`;
+
+      if (isOffline()) {
+        enqueueSync({ table: "shift_sales_reports", rows: inserts, label });
+        return { queued: true as const };
+      }
+      try {
+        const { error } = await supabase.from("shift_sales_reports").insert(inserts);
+        if (error) throw error;
+        return { queued: false as const };
+      } catch (err: any) {
+        const msg = String(err?.message ?? err).toLowerCase();
+        const isNetwork = msg.includes("failed to fetch") || msg.includes("network") || msg.includes("load failed");
+        if (isNetwork) {
+          enqueueSync({ table: "shift_sales_reports", rows: inserts, label });
+          return { queued: true as const };
+        }
+        throw err;
+      }
     },
-    onSuccess: () => {
-      toast.success("Sales entries submitted successfully");
+    onSuccess: (result) => {
+      if (result?.queued) {
+        toast.success("Saved offline — will sync when you reconnect");
+      } else {
+        toast.success("Sales entries submitted successfully");
+      }
       setPumpEntries([]);
       setSelectedAttendant("");
       queryClient.invalidateQueries({ queryKey: ["sales-entries"] });
