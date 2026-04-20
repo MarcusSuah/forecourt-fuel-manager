@@ -234,11 +234,11 @@ export default function ShiftStockReport() {
               <Button variant="outline" size="sm" onClick={() => {
                 const rows = reportData.flatMap((t) =>
                   t.pumps.length > 0
-                    ? t.pumps.map((p) => [t.tankName, t.productType, t.openingDip, t.closingDip, t.tankSales, p.name, p.openingMeter, p.closingMeter, p.meterSales, t.variance])
-                    : [[t.tankName, t.productType, t.openingDip, t.closingDip, t.tankSales, "—", 0, 0, 0, t.variance]]
+                    ? t.pumps.map((p) => [t.tankName, t.productType, t.openingDip, t.closingDip, t.deliveries, t.tankSales, p.name, p.openingMeter, p.closingMeter, p.meterSales, t.variance])
+                    : [[t.tankName, t.productType, t.openingDip, t.closingDip, t.deliveries, t.tankSales, "—", 0, 0, 0, t.variance]]
                 );
                 downloadCSV(`shift-stock-report-${selectedDate}-${shiftName}.csv`,
-                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
+                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Deliveries", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
                   rows
                 );
               }}>
