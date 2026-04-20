@@ -15,7 +15,9 @@ import {
   Tabs, TabsList, TabsTrigger,
 } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, Loader2, RefreshCw, Search, Users } from "lucide-react";
+import { Activity, AlertTriangle, Download, FileText, Loader2, MapPin, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
@@ -31,6 +33,22 @@ type LoginRow = {
   user_full_name: string | null;
   role: string | null;
   user_agent: string | null;
+  created_at: string;
+  ip_address: string | null;
+  country: string | null;
+  city: string | null;
+  device_fingerprint: string | null;
+  is_new_device: boolean;
+};
+
+type FailedRow = {
+  id: string;
+  attempted_email: string | null;
+  ip_address: string | null;
+  country: string | null;
+  city: string | null;
+  user_agent: string | null;
+  failure_reason: string | null;
   created_at: string;
 };
 
