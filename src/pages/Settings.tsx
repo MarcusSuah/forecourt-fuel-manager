@@ -319,6 +319,51 @@ export default function Settings() {
               <Label>Company Name</Label>
               <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Forecourt Management System" />
             </div>
+            <div className="space-y-2">
+              <Label>Company Logo (used in PDF reports)</Label>
+              <div className="flex items-center gap-3">
+                <div className="h-16 w-16 rounded-lg border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadingLogo}
+                    onClick={() => document.getElementById("logo-upload-input")?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    {uploadingLogo ? "Uploading..." : logoUrl ? "Replace" : "Upload Logo"}
+                  </Button>
+                  {logoUrl && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLogoUrl("")}
+                      title="Remove logo"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <input
+                    id="logo-upload-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleLogoUpload(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">PNG or JPG, recommended 200×200px, max 2MB.</p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Primary Currency</Label>
