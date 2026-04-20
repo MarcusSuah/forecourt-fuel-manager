@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Save, Trash2, Wallet, DollarSign, Banknote, Download } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
+import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -51,7 +53,11 @@ export default function CashReports() {
   const { data: branches } = useQuery({
     queryKey: ["branches"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("branches")
+        .select("id, name, county, location")
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
       return data;
     },
