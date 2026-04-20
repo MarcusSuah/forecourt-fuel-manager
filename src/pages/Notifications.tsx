@@ -182,12 +182,13 @@ export default function Notifications() {
       });
     }
 
-    return list.sort((a, b) => {
+    const visible = list.filter((n) => !dismissedKeys.has(n.id));
+    return visible.sort((a, b) => {
       const sev = { critical: 0, warning: 1, info: 2, success: 3 };
       if (sev[a.severity] !== sev[b.severity]) return sev[a.severity] - sev[b.severity];
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
-  }, [tanks, deliveries, cashSales, thresholds]);
+  }, [tanks, deliveries, cashSales, thresholds, dismissedKeys]);
 
   const isLoading = tanksLoading || delsLoading;
 
