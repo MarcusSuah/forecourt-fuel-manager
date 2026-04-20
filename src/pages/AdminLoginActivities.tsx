@@ -107,6 +107,21 @@ export default function AdminLoginActivities() {
     },
   });
 
+  const { data: failedRows, isLoading: failedLoading } = useQuery({
+    queryKey: ["admin-failed-logins", range],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("failed_login_attempts")
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return (data ?? []) as FailedRow[];
+    },
+  });
+
   // Realtime: new logins push toast + refresh
   useEffect(() => {
     if (!isAdmin) return;
@@ -118,10 +133,23 @@ export default function AdminLoginActivities() {
         (payload) => {
           const row = payload.new as LoginRow;
           toast({
-            title: "New sign-in",
-            description: `${row.user_full_name ?? row.user_email ?? "A user"} just signed in${row.role ? ` as ${row.role}` : ""}.`,
+            title: row.is_new_device ? "New sign-in (new device)" : "New sign-in",
+            description: `${row.user_full_name ?? row.user_email ?? "A user"} signed in${row.role ? ` as ${row.role}` : ""}${row.city || row.country ? ` from ${[row.city, row.country].filter(Boolean).join(", ")}` : ""}.`,
           });
           qc.invalidateQueries({ queryKey: ["admin-login-activities"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "failed_login_attempts" },
+        (payload) => {
+          const row = payload.new as FailedRow;
+          toast({
+            variant: "destructive",
+            title: "Failed sign-in attempt",
+            description: `${row.attempted_email ?? "Unknown user"}${row.city || row.country ? ` from ${[row.city, row.country].filter(Boolean).join(", ")}` : ""} — ${row.failure_reason ?? "invalid credentials"}.`,
+          });
+          qc.invalidateQueries({ queryKey: ["admin-failed-logins"] });
         },
       )
       .subscribe();
