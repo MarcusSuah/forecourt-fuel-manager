@@ -136,6 +136,7 @@ export default function Pumps() {
       setFProduct(pump.product_type);
       setFTotalizers(pump.totalizers_count ?? 1);
       setFActive(pump.is_active);
+      setFTankIds([]); // will populate from existingAssignments query
     } else {
       setEditing(null);
       setFName("");
@@ -144,6 +145,7 @@ export default function Pumps() {
       setFProduct("PMS");
       setFTotalizers(1);
       setFActive(true);
+      setFTankIds([]);
     }
     setDialogOpen(true);
   };
@@ -160,12 +162,27 @@ export default function Pumps() {
         totalizers_count: Number(fTotalizers) || 1,
         is_active: fActive,
       };
+      let pumpId: string;
       if (editing?.id) {
         const { error } = await supabase.from("pumps").update(payload).eq("id", editing.id);
         if (error) throw error;
+        pumpId = editing.id;
       } else {
-        const { error } = await supabase.from("pumps").insert(payload);
+        const { data, error } = await supabase.from("pumps").insert(payload).select("id").single();
         if (error) throw error;
+        pumpId = data.id;
+      }
+
+      // Sync tank assignments: remove old (for this pump), insert current selection
+      const { error: delErr } = await supabase
+        .from("tank_pump_assignments")
+        .delete()
+        .eq("pump_id", pumpId);
+      if (delErr) throw delErr;
+      if (fTankIds.length > 0) {
+        const rows = fTankIds.map((tank_id) => ({ pump_id: pumpId, tank_id }));
+        const { error: insErr } = await supabase.from("tank_pump_assignments").insert(rows);
+        if (insErr) throw insErr;
       }
     },
     onSuccess: () => {
@@ -173,6 +190,53 @@ export default function Pumps() {
       setDialogOpen(false);
       qc.invalidateQueries({ queryKey: ["pumps-mgmt"] });
       qc.invalidateQueries({ queryKey: ["pumps-meter"] });
+      qc.invalidateQueries({ queryKey: ["tank-pump-assignments-report"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Copy pumps from one branch to another (recreates pump rows + tank assignments where matching tank names exist)
+  const copyMutation = useMutation({
+    mutationFn: async () => {
+      if (!copySource) throw new Error("Select a source branch");
+      if (!copyTarget) throw new Error("Select a target branch");
+      if (copySource === copyTarget) throw new Error("Source and target must differ");
+
+      const { data: srcPumps, error: e1 } = await supabase
+        .from("pumps")
+        .select("id, name, product_type, totalizers_count, is_active")
+        .eq("branch_id", copySource)
+        .eq("is_active", true);
+      if (e1) throw e1;
+      if (!srcPumps || srcPumps.length === 0) throw new Error("Source branch has no active pumps");
+
+      // Skip names already present in target branch
+      const { data: existing, error: e2 } = await supabase
+        .from("pumps")
+        .select("name")
+        .eq("branch_id", copyTarget);
+      if (e2) throw e2;
+      const existingNames = new Set((existing ?? []).map((p: any) => p.name.toLowerCase()));
+      const toCreate = srcPumps.filter((p: any) => !existingNames.has(p.name.toLowerCase()));
+      if (toCreate.length === 0) throw new Error("All pump names already exist in target branch");
+
+      const insertRows = toCreate.map((p: any) => ({
+        name: p.name,
+        branch_id: copyTarget,
+        product_type: p.product_type,
+        totalizers_count: p.totalizers_count,
+        is_active: true,
+      }));
+      const { error: e3 } = await supabase.from("pumps").insert(insertRows);
+      if (e3) throw e3;
+      return toCreate.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} pump${count === 1 ? "" : "s"} copied`);
+      setCopyOpen(false);
+      setCopySource("");
+      setCopyTarget("");
+      qc.invalidateQueries({ queryKey: ["pumps-mgmt"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
