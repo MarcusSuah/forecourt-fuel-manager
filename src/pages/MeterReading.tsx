@@ -173,7 +173,7 @@ export default function MeterReading() {
     (pumps ?? []).forEach((pump) => {
       const ex = existingReadings?.find((r) => r.pump_id === pump.id);
       const closingRaw = meters[pump.id] ?? ex?.closing_meter;
-      if (closingRaw === undefined || closingRaw === null || closingRaw === "") return;
+      if (closingRaw === undefined || closingRaw === null) return;
       const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
       const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
       const volume = Number(closingRaw) - Number(opening) - Number(rtt);
