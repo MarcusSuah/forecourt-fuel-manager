@@ -1,5 +1,6 @@
-import { Bell, Calendar, MapPin, Fuel } from "lucide-react";
+import { Bell, Calendar, MapPin, Fuel, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 import { useDealerBranch, useShiftSelect } from "@/hooks/useDealerBranch";
 import { Button } from "@/components/ui/button";
 import {
@@ -151,6 +152,11 @@ export function Header({ title, subtitle }: HeaderProps) {
                     </div>
                   ))
                 )}
+              </div>
+              <div className="border-t border-border p-2">
+                <Link to="/notifications" className="flex items-center justify-center gap-1 text-xs font-medium text-primary hover:underline py-1.5">
+                  View all notifications <ArrowRight className="h-3 w-3" />
+                </Link>
               </div>
             </PopoverContent>
           </Popover>
