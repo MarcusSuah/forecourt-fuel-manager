@@ -243,7 +243,18 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
               No events for the selected date range.
             </p>
           ) : (
-            <>
+            <Tabs defaultValue="history" className="w-full">
+              <TabsList className="mb-3">
+                <TabsTrigger value="history">History</TabsTrigger>
+                <TabsTrigger value="reconciliation" className="gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5" /> Reconciliation
+                  {(() => {
+                    const flagged = filteredWithVariance.filter(e => e.type === "dip" && e.dipVariance !== null && e.dipVariance < -reconThreshold).length;
+                    return flagged > 0 ? <Badge variant="destructive" className="ml-1 h-4 px-1.5 text-[10px]">{flagged}</Badge> : null;
+                  })()}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="history" className="space-y-4 mt-0">
               {/* Line Chart */}
               <div className="rounded-lg border border-border bg-card p-3">
                 <div className="flex items-center gap-2 mb-2">
