@@ -159,6 +159,43 @@ export function StockHistoryDialog({
 
   const filteredDesc = useMemo(() => [...filteredWithVariance].reverse(), [filteredWithVariance]);
 
+  // Auto-trigger Critical alerts: any dip whose loss > 2× threshold
+  useEffect(() => {
+    if (!open || !branchId || !branchName || !productType) return;
+    const criticals = filteredWithVariance.filter(
+      (e) => e.type === "dip" && e.dipVariance !== null && e.dipVariance < -reconThreshold * 2
+    );
+    criticals.forEach((ev) => {
+      const key = `${ev.id}-${reconThreshold}`;
+      if (alertedKeys.has(key)) return;
+      const lossUsg = ev.dipVariance ?? 0;
+      // Only alert for events from the last 24h to avoid retroactive spam
+      const ageMs = Date.now() - new Date(ev.timestamp).getTime();
+      if (ageMs > 24 * 60 * 60 * 1000) {
+        setAlertedKeys((prev) => new Set(prev).add(key));
+        return;
+      }
+      setAlertedKeys((prev) => new Set(prev).add(key));
+      supabase.functions.invoke("send-reconciliation-alert", {
+        body: {
+          tank_id: tankId,
+          branch_id: branchId,
+          tank_name: tankName,
+          branch_name: branchName,
+          product_type: productType,
+          loss_usg: lossUsg,
+          threshold_usg: reconThreshold,
+          stock_reading_id: ev.id.replace(/^dip-/, ""),
+          dip_date: ev.date,
+        },
+      }).then(({ error }) => {
+        if (!error) {
+          toast.warning(`Critical alert dispatched for ${tankName}`);
+        }
+      });
+    });
+  }, [open, filteredWithVariance, reconThreshold, branchId, branchName, productType, tankId, tankName, alertedKeys]);
+
   // Summary stats for the selected period
   const summary = useMemo(() => {
     const dips = filteredAsc.filter((e) => e.type === "dip");
