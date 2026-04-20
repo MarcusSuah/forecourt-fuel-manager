@@ -77,6 +77,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!mounted) return;
             setUser({ ...newSession.user, ...details });
             setIsLoading(false);
+            // Record login activity (only on actual sign-in, not token refresh)
+            if (event === "SIGNED_IN") {
+              try {
+                await supabase.from("login_activities").insert({
+                  user_id: newSession.user.id,
+                  user_email: newSession.user.email ?? null,
+                  user_full_name: details.profile?.full_name ?? null,
+                  role: details.role ?? null,
+                  user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+                });
+              } catch (err) {
+                console.warn("[auth] login activity insert failed:", err);
+              }
+            }
           }, 0);
         } else {
           setUser(null);

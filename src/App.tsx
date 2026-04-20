@@ -34,6 +34,7 @@ import ShiftStockReport from "./pages/ShiftStockReport";
 import Notifications from "./pages/Notifications";
 import ReconciliationAlerts from "./pages/ReconciliationAlerts";
 import AdminSyncQueue from "./pages/AdminSyncQueue";
+import AdminLoginActivities from "./pages/AdminLoginActivities";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -76,6 +77,7 @@ function AppShell() {
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             <Route path="/reconciliation-alerts" element={<ProtectedRoute><ReconciliationAlerts /></ProtectedRoute>} />
             <Route path="/admin/sync-queue" element={<ProtectedRoute><AdminSyncQueue /></ProtectedRoute>} />
+            <Route path="/admin/login-activities" element={<ProtectedRoute><AdminLoginActivities /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
