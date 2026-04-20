@@ -443,6 +443,53 @@ export default function TankDipping() {
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
                           </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                title={`Configure threshold (current: ±${threshold.toLocaleString()} USG)`}
+                              >
+                                <Settings2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64" align="end">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-sm font-medium">Reconciliation Threshold</p>
+                                  <p className="text-xs text-muted-foreground">{tank.name} • Variance over this triggers a critical alert.</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label htmlFor={`thr-${tank.id}`} className="text-xs">Threshold (USG)</Label>
+                                  <Input
+                                    id={`thr-${tank.id}`}
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    value={thresholdDraft[tank.id] ?? String(threshold)}
+                                    onChange={(e) => setThresholdDraft((p) => ({ ...p, [tank.id]: e.target.value }))}
+                                  />
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="w-full"
+                                  disabled={thresholdMutation.isPending}
+                                  onClick={() => {
+                                    const v = Number(thresholdDraft[tank.id] ?? threshold);
+                                    if (Number.isNaN(v) || v < 0) {
+                                      toast.error("Enter a valid non-negative number");
+                                      return;
+                                    }
+                                    thresholdMutation.mutate({ tankId: tank.id, value: v });
+                                  }}
+                                >
+                                  Save threshold
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </TableCell>
                       <TableCell>
