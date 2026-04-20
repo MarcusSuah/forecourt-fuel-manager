@@ -127,17 +127,8 @@ export default function MeterReading() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!branchId || !selectedShift) throw new Error("Select branch and shift");
-      const pumpIds = Object.keys({ ...meters, ...openings, ...rtts });
+      const pumpIds = Object.keys({ ...meters, ...openings, ...rtts, ...prices, ...attendantSel });
       if (pumpIds.length === 0) throw new Error("No readings to save");
-
-      // Get any attendant assigned to this branch as fallback
-      const { data: anyAttendant } = await supabase
-        .from("attendants")
-        .select("id")
-        .eq("branch_id", branchId)
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
 
       const rows = pumpIds.map((pumpId) => {
         const existing = existingReadings?.find((r) => r.pump_id === pumpId);
@@ -145,9 +136,10 @@ export default function MeterReading() {
           openings[pumpId] ?? existing?.opening_meter ?? getOpeningMeter(pumpId);
         const closing = meters[pumpId] ?? existing?.closing_meter ?? 0;
         const rtt = rtts[pumpId] ?? existing?.rtt_usg ?? 0;
-        const attendantId = existing?.attendant_id ?? anyAttendant?.id;
+        const price = prices[pumpId] ?? existing?.unit_price_usd ?? 0;
+        const attendantId = attendantSel[pumpId] ?? existing?.attendant_id;
         if (!attendantId) {
-          throw new Error("No attendant available for this branch. Assign one first.");
+          throw new Error("Select an attendant for every pump with readings.");
         }
         return {
           branch_id: branchId,
@@ -158,7 +150,7 @@ export default function MeterReading() {
           opening_meter: Number(opening) || 0,
           closing_meter: Number(closing) || 0,
           rtt_usg: Number(rtt) || 0,
-          unit_price_usd: 0,
+          unit_price_usd: Number(price) || 0,
           created_by: user?.id ?? null,
         };
       });
@@ -175,6 +167,8 @@ export default function MeterReading() {
       setMeters({});
       setOpenings({});
       setRtts({});
+      setPrices({});
+      setAttendantSel({});
     },
     onError: (err: any) => toast.error(err.message ?? "Failed to save"),
   });
