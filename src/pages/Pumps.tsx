@@ -422,12 +422,75 @@ export default function Pumps() {
                 </div>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Tank assignment is managed on the Tank Management page.</p>
+            <div className="space-y-2">
+              <Label>Assigned Tanks <span className="text-xs text-muted-foreground font-normal">({fProduct} only, same branch)</span></Label>
+              {!fBranch ? (
+                <p className="text-xs text-muted-foreground">Select a branch first.</p>
+              ) : (formTanks ?? []).length === 0 ? (
+                <p className="text-xs text-muted-foreground">No active {fProduct} tanks in this branch.</p>
+              ) : (
+                <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-2">
+                  {formTanks?.map((t: any) => {
+                    const checked = fTankIds.includes(t.id);
+                    return (
+                      <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) =>
+                            setFTankIds((prev) => (v ? [...prev, t.id] : prev.filter((x) => x !== t.id)))
+                          }
+                        />
+                        <span className="font-medium">{t.name}</span>
+                        <span className="text-xs text-muted-foreground">· {Number(t.capacity_usg).toLocaleString()} USG</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">One pump can be linked to multiple tanks of the same product.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? "Saving…" : editing ? "Save Changes" : "Add Pump"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Copy Pumps to Another Branch</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="space-y-2">
+              <Label>Source Branch</Label>
+              <Select value={copySource} onValueChange={setCopySource}>
+                <SelectTrigger><SelectValue placeholder="Copy pumps from…" /></SelectTrigger>
+                <SelectContent>
+                  {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Target Branch</Label>
+              <Select value={copyTarget} onValueChange={setCopyTarget}>
+                <SelectTrigger><SelectValue placeholder="Copy pumps to…" /></SelectTrigger>
+                <SelectContent>
+                  {branches?.filter((b) => b.id !== copySource).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Duplicates active pumps (name, product, totalizers) from source to target. Pumps with names that already exist in the target branch are skipped. Tank assignments are not copied.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCopyOpen(false)}>Cancel</Button>
+            <Button onClick={() => copyMutation.mutate()} disabled={copyMutation.isPending || !copySource || !copyTarget}>
+              {copyMutation.isPending ? "Copying…" : "Copy Pumps"}
             </Button>
           </DialogFooter>
         </DialogContent>
