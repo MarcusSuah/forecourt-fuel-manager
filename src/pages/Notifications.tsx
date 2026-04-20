@@ -268,6 +268,7 @@ export default function Notifications() {
         {items.map((n) => {
           const Icon = n.type === "delivery" ? Truck
             : n.type === "cash-variance" ? DollarSign
+            : n.type === "reconciliation" ? ShieldAlert
             : n.type.startsWith("tank") ? Droplets
             : AlertTriangle;
           const tone = n.severity === "critical" ? "bg-destructive/10 border-destructive/30 text-destructive"
@@ -379,12 +380,14 @@ export default function Notifications() {
               <TabsTrigger value="tanks">Tanks ({filterByType("tanks").length})</TabsTrigger>
               <TabsTrigger value="deliveries">Deliveries ({filterByType("deliveries").length})</TabsTrigger>
               <TabsTrigger value="cash">Cash ({filterByType("cash").length})</TabsTrigger>
+              <TabsTrigger value="reconciliation">Reconciliation ({filterByType("reconciliation").length})</TabsTrigger>
             </TabsList>
             <TabsContent value="all">{renderList(notifications)}</TabsContent>
             <TabsContent value="alerts">{renderList(filterByType("alerts"))}</TabsContent>
             <TabsContent value="tanks">{renderList(filterByType("tanks"))}</TabsContent>
             <TabsContent value="deliveries">{renderList(filterByType("deliveries"))}</TabsContent>
             <TabsContent value="cash">{renderList(filterByType("cash"))}</TabsContent>
+            <TabsContent value="reconciliation">{renderList(filterByType("reconciliation"))}</TabsContent>
           </Tabs>
         </CardContent>
       </Card>
