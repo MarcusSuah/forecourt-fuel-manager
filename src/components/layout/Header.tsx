@@ -159,18 +159,31 @@ export function Header({ title, subtitle }: HeaderProps) {
                 {alertCount === 0 ? (
                   <div className="p-6 text-center text-sm text-muted-foreground">All systems normal ✓</div>
                 ) : (
-                  tankAlerts?.map(t => (
-                    <div key={t.id} className="flex items-start gap-3 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", t.pct < 20 ? "bg-destructive animate-pulse" : "bg-warning")} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">{(t.branches as any)?.name} · {t.product_type} · {t.pct.toFixed(0)}%</p>
+                  visibleAlerts.map(t => {
+                    const key = t.pct < 20 ? `tank-crit-${t.id}` : `tank-low-${t.id}`;
+                    const type = t.pct < 20 ? "tank-critical" : "tank-low";
+                    return (
+                      <div key={t.id} className="flex items-start gap-2 p-3 border-b border-border/50 hover:bg-muted/50 transition-colors">
+                        <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", t.pct < 20 ? "bg-destructive animate-pulse" : "bg-warning")} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{t.name}</p>
+                          <p className="text-xs text-muted-foreground">{(t.branches as any)?.name} · {t.product_type} · {t.pct.toFixed(0)}%</p>
+                        </div>
+                        <Badge variant="outline" className={cn("text-[10px] shrink-0", t.pct < 20 ? "border-destructive text-destructive" : "border-warning text-warning")}>
+                          {t.pct < 20 ? "CRIT" : "LOW"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 opacity-60 hover:opacity-100"
+                          title="Dismiss"
+                          onClick={(e) => { e.stopPropagation(); dismiss({ key, type }); }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
                       </div>
-                      <Badge variant="outline" className={cn("text-[10px] shrink-0", t.pct < 20 ? "border-destructive text-destructive" : "border-warning text-warning")}>
-                        {t.pct < 20 ? "CRIT" : "LOW"}
-                      </Badge>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
               <div className="border-t border-border p-2">
