@@ -181,9 +181,13 @@ export default function Reports() {
 
   const generateReport = () => setReportGenerated(true);
 
-  const printReport = () => {
+  const printReport = async () => {
     const reportTitle = activeTab === "daily" ? "Daily Sales Report" : "Branch Performance Report";
     const subtitle = `${format(parseISO(dateFrom), "MMM dd, yyyy")} to ${format(parseISO(dateTo), "MMM dd, yyyy")}${statusFilter !== "all" ? ` (${statusFilter} branches only)` : ""}`;
+    const branch = branchFilter !== "all"
+      ? branches?.find((b) => b.id === branchFilter)
+      : null;
+    const headerInfo = await buildPDFHeaderInfo(branch);
     if (activeTab === "daily") {
       exportTableToPDF(
         reportTitle, subtitle,
@@ -194,13 +198,16 @@ export default function Reports() {
           { label: "Total Sales", value: `$${grandTotals.salesUsd.toFixed(2)}` },
           { label: "Total Cash", value: `$${grandTotals.cashUsd.toFixed(2)}` },
           { label: "Variance", value: `${grandTotals.variance >= 0 ? "+" : ""}$${grandTotals.variance.toFixed(2)}` },
-        ]
+        ],
+        headerInfo,
       );
     } else {
       exportTableToPDF(
         reportTitle, subtitle,
         ["Branch", "PMS (USG)", "AGO (USG)", "Sales ($)", "Cash ($)", "Variance ($)"],
-        branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), `$${b.salesUsd.toFixed(2)}`, `$${b.cashUsd.toFixed(2)}`, `${b.variance >= 0 ? "+" : ""}$${b.variance.toFixed(2)}`])
+        branchSummary.map(b => [b.name, b.pmsUsg.toFixed(1), b.agoUsg.toFixed(1), `$${b.salesUsd.toFixed(2)}`, `$${b.cashUsd.toFixed(2)}`, `${b.variance >= 0 ? "+" : ""}$${b.variance.toFixed(2)}`]),
+        undefined,
+        headerInfo,
       );
     }
   };
