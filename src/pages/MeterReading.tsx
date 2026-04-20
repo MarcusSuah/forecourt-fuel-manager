@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -9,17 +9,23 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Gauge } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Gauge, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function MeterReading() {
   const { isDealer, dealerBranchId } = useDealerBranch();
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const [selectedBranch, setSelectedBranch] = useState(dealerBranchId || "");
   const [selectedShift, setSelectedShift] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [meters, setMeters] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
+  const [rtts, setRtts] = useState<Record<string, number>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
