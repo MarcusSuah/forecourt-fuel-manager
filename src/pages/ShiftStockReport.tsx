@@ -315,6 +315,7 @@ export default function ShiftStockReport() {
                         <TableHead>Tank</TableHead>
                         <TableHead className="text-right">Opening Dip</TableHead>
                         <TableHead className="text-right">Closing Dip</TableHead>
+                        <TableHead className="text-right">Deliveries</TableHead>
                         <TableHead className="text-right">Tank Sales</TableHead>
                         <TableHead>Pump</TableHead>
                         <TableHead className="text-right">Opening Meter</TableHead>
@@ -333,6 +334,9 @@ export default function ShiftStockReport() {
                                   <TableCell rowSpan={tank.pumps.length} className="font-medium align-top">{tank.tankName}</TableCell>
                                   <TableCell rowSpan={tank.pumps.length} className="text-right align-top">{tank.openingDip.toLocaleString()}</TableCell>
                                   <TableCell rowSpan={tank.pumps.length} className="text-right align-top">{tank.closingDip.toLocaleString()}</TableCell>
+                                  <TableCell rowSpan={tank.pumps.length} className={cn("text-right align-top", tank.deliveries > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
+                                    {tank.deliveries > 0 ? `+${tank.deliveries.toLocaleString()}` : "—"}
+                                  </TableCell>
                                   <TableCell rowSpan={tank.pumps.length} className="text-right align-top font-medium">{tank.tankSales.toLocaleString()}</TableCell>
                                 </>
                               )}
@@ -352,6 +356,9 @@ export default function ShiftStockReport() {
                             <TableCell className="font-medium">{tank.tankName}</TableCell>
                             <TableCell className="text-right">{tank.openingDip.toLocaleString()}</TableCell>
                             <TableCell className="text-right">{tank.closingDip.toLocaleString()}</TableCell>
+                            <TableCell className={cn("text-right", tank.deliveries > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
+                              {tank.deliveries > 0 ? `+${tank.deliveries.toLocaleString()}` : "—"}
+                            </TableCell>
                             <TableCell className="text-right font-medium">{tank.tankSales.toLocaleString()}</TableCell>
                             <TableCell colSpan={3} className="text-center text-muted-foreground text-sm">No pumps assigned</TableCell>
                             <TableCell className="text-right">—</TableCell>
@@ -363,6 +370,7 @@ export default function ShiftStockReport() {
                         <TableCell>Total {product}</TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.openingDip, 0).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.closingDip, 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.deliveries, 0).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.tankSales, 0).toLocaleString()}</TableCell>
                         <TableCell colSpan={3}></TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.totalMeterSales, 0).toLocaleString()}</TableCell>
