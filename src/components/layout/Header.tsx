@@ -1,4 +1,4 @@
-import { Bell, Calendar, MapPin, Fuel, ArrowRight } from "lucide-react";
+import { Bell, Calendar, MapPin, Fuel, ArrowRight, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { useDealerBranch, useShiftSelect } from "@/hooks/useDealerBranch";
@@ -9,10 +9,12 @@ import {
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useDismissedNotifications } from "@/hooks/useDismissedNotifications";
+import { useEffect } from "react";
 
 interface HeaderProps {
   title: string;
@@ -23,6 +25,8 @@ export function Header({ title, subtitle }: HeaderProps) {
   const { user } = useAuth();
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
   const { shifts, selectedShift, setSelectedShift } = useShiftSelect();
+  const queryClient = useQueryClient();
+  const { dismissedKeys, dismiss } = useDismissedNotifications();
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     year: "numeric",
@@ -58,7 +62,23 @@ export function Header({ title, subtitle }: HeaderProps) {
     refetchInterval: 30000,
   });
 
-  const alertCount = tankAlerts?.length ?? 0;
+  // Real-time tank updates so the bell badge reflects changes instantly
+  useEffect(() => {
+    const channel = supabase
+      .channel("header-tanks-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tanks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["header-tank-alerts"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
+  // Hide alerts the user has already dismissed on the Notifications page
+  const visibleAlerts = (tankAlerts ?? []).filter((t) => {
+    const key = t.pct < 20 ? `tank-crit-${t.id}` : `tank-low-${t.id}`;
+    return !dismissedKeys.has(key);
+  });
+  const alertCount = visibleAlerts.length;
 
   return (
     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
