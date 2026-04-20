@@ -262,7 +262,48 @@ export default function TankDipping() {
       </Card>
 
       {branchId && selectedShift && (
-        <Card>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Tanks</p>
+                    <p className="text-2xl font-bold">{summary.totalTanks}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{summary.withReading} with readings</p>
+                  </div>
+                  <Droplets className="h-8 w-8 text-primary opacity-70" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={cn(summary.criticalCount > 0 && "border-destructive/50 bg-destructive/5")}>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Critical Variances</p>
+                    <p className={cn("text-2xl font-bold", summary.criticalCount > 0 && "text-destructive")}>
+                      {summary.criticalCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Over tank threshold</p>
+                  </div>
+                  <AlertTriangle className={cn("h-8 w-8 opacity-70", summary.criticalCount > 0 ? "text-destructive" : "text-muted-foreground")} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total |Variance|</p>
+                    <p className="text-2xl font-bold">{summary.totalAbsVariance.toLocaleString(undefined, { maximumFractionDigits: 1 })}</p>
+                    <p className="text-xs text-muted-foreground mt-1">USG across all tanks</p>
+                  </div>
+                  <TrendingDown className="h-8 w-8 text-warning opacity-70" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
