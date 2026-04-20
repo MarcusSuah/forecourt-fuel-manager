@@ -1,4 +1,4 @@
-import { CloudOff, CloudCheck, RefreshCw, Trash2, AlertTriangle, Loader2 } from "lucide-react";
+import { CloudOff, Cloud, RefreshCw, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -71,7 +71,7 @@ export function SyncStatusBadge() {
               {offline ? (
                 <><CloudOff className="h-4 w-4 text-warning" /> Offline</>
               ) : total === 0 ? (
-                <><CloudCheck className="h-4 w-4 text-success" /> All synced</>
+                <><Cloud className="h-4 w-4 text-success" /> All synced</>
               ) : (
                 <><CloudOff className="h-4 w-4 text-warning" /> Pending sync</>
               )}
