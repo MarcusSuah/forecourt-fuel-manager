@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
+import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 
 export default function ShiftStockReport() {
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
+  const { user } = useAuth();
   const [selectedBranch, setSelectedBranch] = useState(dealerBranchId || "");
   const [selectedShift, setSelectedShift] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -238,6 +240,7 @@ export default function ShiftStockReport() {
                     { label: "Net Variance", value: `${totalVariance >= 0 ? "+" : ""}${totalVariance.toLocaleString()} USG` },
                   ],
                   headerInfo,
+                  user?.profile?.full_name ?? user?.email ?? undefined,
                 );
               }}>
                 <Download className="h-4 w-4 mr-1" /> PDF

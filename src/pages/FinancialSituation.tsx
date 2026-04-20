@@ -135,7 +135,9 @@ export default function FinancialSituation() {
                 const allRows = [...(assets || []).map(a => ["Asset", a.name, a.category, `$${Number(a.value).toLocaleString()}`, a.date]), ...(liabilities || []).map(l => ["Liability", l.name, l.category, `$${Number(l.value).toLocaleString()}`, l.date])];
                 if (!allRows.length) return toast.error("No data");
                 exportTableToPDF("Financial Situation", `${fromMonth} to ${toMonth}`, ["Type","Name","Category","Value","Date"], allRows,
-                  [{ label: "Total Assets", value: `$${totalAssets.toLocaleString()}` }, { label: "Total Liabilities", value: `$${totalLiabilities.toLocaleString()}` }, { label: "Net Worth", value: `$${netWorth.toLocaleString()}` }]);
+                  [{ label: "Total Assets", value: `$${totalAssets.toLocaleString()}` }, { label: "Total Liabilities", value: `$${totalLiabilities.toLocaleString()}` }, { label: "Net Worth", value: `$${netWorth.toLocaleString()}` }],
+                  undefined,
+                  user?.profile?.full_name ?? user?.email ?? undefined);
               }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
             </div>
           </CardContent>

@@ -323,6 +323,7 @@ export default function CashReports() {
                     { label: "Total (USD)", value: `$${submittedTotals.totalUsd.toFixed(2)}` },
                   ],
                   headerInfo,
+                  user?.profile?.full_name ?? user?.email ?? undefined,
                 );
               }}><Download className="h-4 w-4 mr-1" /> PDF</Button>
             </div>

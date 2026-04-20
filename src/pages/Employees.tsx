@@ -222,7 +222,9 @@ export default function Employees() {
             <Button variant="outline" size="sm" onClick={() => {
               if (!filtered?.length) return toast.error("No data to export");
               exportTableToPDF("Employee Registry", `${filtered.length} employees`, ["Full Name","Position","Status","Phone","Salary","Branch"],
-                filtered.map(e => [e.full_name, e.position, (e as any).employment_status || "active", e.phone || "—", `$${Number(e.gross_salary).toLocaleString()}`, (e as any).branches?.name || "—"]));
+                filtered.map(e => [e.full_name, e.position, (e as any).employment_status || "active", e.phone || "—", `$${Number(e.gross_salary).toLocaleString()}`, (e as any).branches?.name || "—"]),
+                undefined, undefined,
+                user?.profile?.full_name ?? user?.email ?? undefined);
             }}><FileText className="h-4 w-4 mr-1" /> PDF</Button>
             {filtered && filtered.length > 0 && (
               <BulkPrintIDCards
