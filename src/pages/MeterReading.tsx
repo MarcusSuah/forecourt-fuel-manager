@@ -95,10 +95,27 @@ export default function MeterReading() {
       if (!prevShiftId) return [];
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, closing_meter")
+        .select("pump_id, closing_meter, unit_price_usd")
         .eq("branch_id", branchId!)
         .eq("shift_id", prevShiftId)
         .eq("date", prevDate);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Attendants assigned to specific pumps for this shift+date
+  const { data: assignments } = useQuery({
+    queryKey: ["pump-attendant-assignments", branchId, selectedDate, selectedShift],
+    enabled: !!branchId && !!selectedShift,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendant_assignments")
+        .select("pump_id, attendant_id, attendants!inner(id, full_name, branch_id, is_active)")
+        .eq("date", selectedDate)
+        .eq("shift_id", selectedShift)
+        .eq("attendants.branch_id", branchId!)
+        .eq("attendants.is_active", true);
       if (error) throw error;
       return data;
     },
@@ -122,6 +139,19 @@ export default function MeterReading() {
   const getOpeningMeter = (pumpId: string) => {
     const prev = prevMeters?.find((m) => m.pump_id === pumpId);
     return prev ? Number(prev.closing_meter) : 0;
+  };
+
+  const getPrevPrice = (pumpId: string) => {
+    const prev = prevMeters?.find((m) => m.pump_id === pumpId);
+    return prev ? Number(prev.unit_price_usd) || 0 : 0;
+  };
+
+  const getPumpAttendants = (pumpId: string) => {
+    const assigned = (assignments ?? [])
+      .filter((a) => a.pump_id === pumpId)
+      .map((a: any) => ({ id: a.attendants.id, full_name: a.attendants.full_name }));
+    if (assigned.length > 0) return assigned;
+    return branchAttendants ?? [];
   };
 
   const saveMutation = useMutation({
@@ -235,20 +265,30 @@ export default function MeterReading() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(pumps ?? []).map((pump) => {
+                {(() => {
+                  let totalVolume = 0;
+                  let totalSales = 0;
+                  const rows = (pumps ?? []).map((pump) => {
                   const existing = existingReadings?.find((r) => r.pump_id === pump.id);
                   const carryOver = getOpeningMeter(pump.id);
+                  const prevPrice = getPrevPrice(pump.id);
+                  const pumpAttendants = getPumpAttendants(pump.id);
                   const opening =
                     openings[pump.id] ?? existing?.opening_meter ?? carryOver;
                   const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
                   const rtt = rtts[pump.id] ?? existing?.rtt_usg ?? 0;
-                  const price = prices[pump.id] ?? existing?.unit_price_usd ?? 0;
+                  const price =
+                    prices[pump.id] ?? existing?.unit_price_usd ?? prevPrice;
                   const attendantId =
                     attendantSel[pump.id] ?? existing?.attendant_id ?? "";
                   const volume =
                     closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : null;
                   const total = volume !== null ? volume * Number(price) : null;
                   const isBad = volume !== null && volume <= 0;
+                  if (volume !== null && !isBad) {
+                    totalVolume += volume;
+                    totalSales += total ?? 0;
+                  }
                   return (
                     <TableRow
                       key={pump.id}
@@ -276,7 +316,7 @@ export default function MeterReading() {
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            {branchAttendants?.map((a) => (
+                            {pumpAttendants.map((a) => (
                               <SelectItem key={a.id} value={a.id}>
                                 {a.full_name}
                               </SelectItem>
@@ -334,7 +374,7 @@ export default function MeterReading() {
                           type="number"
                           step="0.01"
                           className="w-24 ml-auto"
-                          value={prices[pump.id] ?? existing?.unit_price_usd ?? 0}
+                          value={prices[pump.id] ?? existing?.unit_price_usd ?? prevPrice}
                           onChange={(e) =>
                             setPrices((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
                           }
@@ -353,7 +393,25 @@ export default function MeterReading() {
                       </TableCell>
                     </TableRow>
                   );
-                })}
+                  });
+                  return (
+                    <>
+                      {rows}
+                      <TableRow data-totals className="font-semibold bg-muted/40">
+                        <TableCell colSpan={6} className="text-right">
+                          Shift Totals
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right">
+                          {totalVolume.toLocaleString()} USG
+                        </TableCell>
+                        <TableCell className="text-right">
+                          ${totalSales.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    </>
+                  );
+                })()}
               </TableBody>
             </Table>
           </CardContent>
