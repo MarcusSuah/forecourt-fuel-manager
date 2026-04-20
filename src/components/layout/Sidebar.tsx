@@ -22,6 +22,7 @@ const navigation = [
   { name: "Branches", href: "/branches", icon: Building2, permission: "branches.view" },
   { name: "Tank Management", href: "/tanks", icon: Droplets, permission: "tanks.view" },
   { name: "Tank Dipping", href: "/tank-dipping", icon: Droplets, permission: "tanks.view" },
+  { name: "Pump Management", href: "/pumps", icon: Fuel, permission: "pumps.view" },
   { name: "Meter Readings", href: "/meter-reading", icon: Gauge, permission: "sales.view" },
   { name: "Shift Stock Report", href: "/shift-stock-report", icon: ClipboardList, permission: "stock.view" },
   { name: "Sales Entry", href: "/sales", icon: Receipt, permission: "sales.manage" },
