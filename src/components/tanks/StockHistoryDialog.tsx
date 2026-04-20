@@ -8,8 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Droplets, Truck, Download, TrendingUp } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCSV } from "@/lib/csv-export";
 import {
@@ -109,7 +109,42 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
     return data.filter((ev) => ev.date >= dateFrom && ev.date <= dateTo);
   }, [data, dateFrom, dateTo]);
 
-  const filteredDesc = useMemo(() => [...filteredAsc].reverse(), [filteredAsc]);
+  // Compute dip-to-dip variance on the ascending list (vs previous dip), then reverse for display
+  const filteredWithVariance = useMemo(() => {
+    let prevDipLevel: number | null = null;
+    return filteredAsc.map((ev) => {
+      let dipVariance: number | null = null;
+      if (ev.type === "dip") {
+        if (prevDipLevel !== null) dipVariance = ev.qty - prevDipLevel;
+        prevDipLevel = ev.qty;
+      }
+      return { ...ev, dipVariance };
+    });
+  }, [filteredAsc]);
+
+  const filteredDesc = useMemo(() => [...filteredWithVariance].reverse(), [filteredWithVariance]);
+
+  // Summary stats for the selected period
+  const summary = useMemo(() => {
+    const dips = filteredAsc.filter((e) => e.type === "dip");
+    const dels = filteredAsc.filter((e) => e.type === "delivery");
+    const totalDeliveries = dels.reduce((s, d) => s + d.qty, 0);
+    const dipCount = dips.length;
+    const deliveryCount = dels.length;
+    const startLevel = filteredAsc[0]?.resultingLevel ?? 0;
+    const endLevel = filteredAsc[filteredAsc.length - 1]?.resultingLevel ?? 0;
+    const netChange = endLevel - startLevel;
+    return { totalDeliveries, dipCount, deliveryCount, netChange };
+  }, [filteredAsc]);
+
+  const setPreset = (preset: "7d" | "30d" | "month" | "year") => {
+    const now = new Date();
+    setDateTo(format(now, "yyyy-MM-dd"));
+    if (preset === "7d") setDateFrom(format(subDays(now, 7), "yyyy-MM-dd"));
+    else if (preset === "30d") setDateFrom(format(subDays(now, 30), "yyyy-MM-dd"));
+    else if (preset === "month") setDateFrom(format(startOfMonth(now), "yyyy-MM-dd"));
+    else if (preset === "year") setDateFrom(format(startOfYear(now), "yyyy-MM-dd"));
+  };
 
   const chartData = useMemo(
     () =>
@@ -124,12 +159,13 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
   const handleExport = () => {
     downloadCSV(
       `stock-history-${tankName}-${dateFrom}-to-${dateTo}.csv`,
-      ["Date", "Type", "Description", "Change (USG)", "Running Balance (USG)"],
+      ["Date", "Type", "Description", "Change (USG)", "Dip Variance (USG)", "Running Balance (USG)"],
       filteredDesc.map((ev) => [
         ev.date,
         ev.type === "dip" ? "Dip" : "Delivery",
         ev.label,
         ev.type === "delivery" ? `+${ev.qty}` : `=${ev.qty}`,
+        ev.dipVariance === null || ev.dipVariance === undefined ? "" : (ev.dipVariance >= 0 ? `+${ev.dipVariance}` : `${ev.dipVariance}`),
         ev.resultingLevel,
       ])
     );
