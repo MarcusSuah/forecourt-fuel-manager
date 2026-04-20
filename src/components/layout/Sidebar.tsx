@@ -6,6 +6,7 @@ import {
   TrendingUp, LogOut, ShieldCheck, Truck, UserCog, CalendarDays,
   DollarSign, PieChart, Landmark, MessageCircle, Lock, Gauge,
   ClipboardList, Bell,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +35,7 @@ const navigation = [
   { name: "Analytics", href: "/analytics", icon: TrendingUp, permission: "analytics.view" },
   { name: "Permissions", href: "/permissions", icon: Lock, permission: "permissions.manage" },
   { name: "Admin", href: "/admin", icon: ShieldCheck, permission: "admin.manage" },
+  { name: "Reconciliation Alerts", href: "/reconciliation-alerts", icon: ShieldAlert, permission: "admin.manage" },
   { name: "Notifications", href: "/notifications", icon: Bell, permission: null },
   { name: "Chat", href: "/chat", icon: MessageCircle, permission: null },
   { name: "Settings", href: "/settings", icon: Settings, permission: null },
