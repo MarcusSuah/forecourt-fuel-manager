@@ -145,7 +145,8 @@ export default function TankDipping() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!branchId || !selectedShift) throw new Error("Select branch and shift");
-      const entries = (tanks ?? [])
+      const tanksToSave = (tanks ?? []).filter((t) => dips[t.id] !== undefined);
+      const entries = tanksToSave
         .filter((t) => dips[t.id] !== undefined)
         .map((t) => ({
           branch_id: branchId,
@@ -157,12 +158,53 @@ export default function TankDipping() {
           created_by: user?.id,
         }));
       if (entries.length === 0) throw new Error("Enter at least one dip reading");
-      const { error } = await supabase.from("stock_readings").upsert(entries, { onConflict: "branch_id,tank_id,shift_id,date" });
+      const { data: saved, error } = await supabase
+        .from("stock_readings")
+        .upsert(entries, { onConflict: "branch_id,tank_id,shift_id,date" })
+        .select("id, tank_id");
       if (error) throw error;
+
+      // Auto-dispatch critical reconciliation alerts
+      const branchName = branches?.find((b) => b.id === branchId)?.name ?? "Branch";
+      const criticals = tanksToSave
+        .map((t) => {
+          const opening = getOpeningDip(t.id);
+          const closing = Number(dips[t.id]);
+          const tankSales = opening - closing;
+          const meterSales = pumpSales?.[t.id] ?? 0;
+          const variance = tankSales - meterSales;
+          const threshold = Number(t.reconciliation_threshold_usg ?? 0);
+          return { tank: t, variance, threshold };
+        })
+        .filter((x) => x.threshold > 0 && Math.abs(x.variance) > x.threshold);
+
+      await Promise.all(
+        criticals.map(({ tank, variance, threshold }) => {
+          const stockReadingId = saved?.find((s) => s.tank_id === tank.id)?.id;
+          return supabase.functions.invoke("send-reconciliation-alert", {
+            body: {
+              tank_id: tank.id,
+              branch_id: branchId,
+              tank_name: tank.name,
+              branch_name: branchName,
+              product_type: tank.product_type,
+              loss_usg: variance < 0 ? variance : -Math.abs(variance),
+              threshold_usg: threshold,
+              stock_reading_id: stockReadingId,
+              dip_date: selectedDate,
+            },
+          });
+        })
+      );
+      return { criticalCount: criticals.length };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success("Dip readings saved");
+      if (res?.criticalCount) {
+        toast.warning(`${res.criticalCount} critical variance alert(s) dispatched`);
+      }
       queryClient.invalidateQueries({ queryKey: ["current-dips"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation-alerts"] });
       setDips({});
       setOpenings({});
     },
