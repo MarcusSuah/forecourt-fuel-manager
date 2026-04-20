@@ -206,6 +206,42 @@ export default function ShiftStockReport() {
               }}>
                 <Download className="h-4 w-4 mr-1" /> CSV
               </Button>
+              <Button variant="outline" size="sm" onClick={async () => {
+                const branch = isDealer
+                  ? dealerBranchInfo
+                  : branches?.find((b) => b.id === selectedBranch);
+                const headerInfo = await buildPDFHeaderInfo(branch);
+                const rows = reportData.flatMap((t) =>
+                  t.pumps.length > 0
+                    ? t.pumps.map((p) => [
+                        t.tankName, t.productType,
+                        t.openingDip.toLocaleString(), t.closingDip.toLocaleString(),
+                        t.tankSales.toLocaleString(),
+                        p.name,
+                        Number(p.openingMeter).toLocaleString(),
+                        Number(p.closingMeter).toLocaleString(),
+                        p.meterSales.toLocaleString(),
+                        `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`,
+                      ])
+                    : [[t.tankName, t.productType, t.openingDip.toLocaleString(), t.closingDip.toLocaleString(), t.tankSales.toLocaleString(), "—", "0", "0", "0", `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`]]
+                );
+                const totalVariance = reportData.reduce((s, t) => s + t.variance, 0);
+                exportTableToPDF(
+                  "Shift Stock Report",
+                  `${shiftName} Shift • ${format(new Date(selectedDate), "MMMM dd, yyyy")}`,
+                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
+                  rows,
+                  [
+                    { label: "Tanks", value: String(reportData.length) },
+                    { label: "Total Tank Sales", value: `${reportData.reduce((s, t) => s + t.tankSales, 0).toLocaleString()} USG` },
+                    { label: "Total Meter Sales", value: `${reportData.reduce((s, t) => s + t.totalMeterSales, 0).toLocaleString()} USG` },
+                    { label: "Net Variance", value: `${totalVariance >= 0 ? "+" : ""}${totalVariance.toLocaleString()} USG` },
+                  ],
+                  headerInfo,
+                );
+              }}>
+                <Download className="h-4 w-4 mr-1" /> PDF
+              </Button>
             </div>
           </div>
         </CardContent>
