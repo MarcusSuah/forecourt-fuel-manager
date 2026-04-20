@@ -299,9 +299,16 @@ export default function Pumps() {
                 </Select>
               )}
               {canManage && (
-                <Button size="sm" onClick={() => openDialog()}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Pump
-                </Button>
+                <>
+                  {!isDealer && (
+                    <Button size="sm" variant="outline" onClick={() => setCopyOpen(true)}>
+                      <Copy className="h-4 w-4 mr-1" /> Copy Pumps
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={() => openDialog()}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Pump
+                  </Button>
+                </>
               )}
             </div>
           </div>
