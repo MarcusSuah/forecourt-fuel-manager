@@ -194,9 +194,19 @@ export default function MeterReading() {
       {branchId && selectedShift && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Gauge className="h-5 w-5 text-primary" /> Pump Meter Readings
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-primary" /> Pump Meter Readings
+              </CardTitle>
+              <Button
+                size="sm"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saveMutation.isPending ? "Saving..." : "Save Readings"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -206,6 +216,7 @@ export default function MeterReading() {
                   <TableHead>Product</TableHead>
                   <TableHead className="text-right">Opening Meter</TableHead>
                   <TableHead className="text-right">Closing Meter</TableHead>
+                  <TableHead className="text-right">RTT (USG)</TableHead>
                   <TableHead className="text-right">Volume (USG)</TableHead>
                 </TableRow>
               </TableHeader>
@@ -216,7 +227,9 @@ export default function MeterReading() {
                   const opening =
                     openings[pump.id] ?? existing?.opening_meter ?? carryOver;
                   const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
-                  const volume = closing !== "" ? Number(closing) - Number(opening) : null;
+                  const rtt = rtts[pump.id] ?? existing?.rtt_usg ?? 0;
+                  const volume =
+                    closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : null;
                   return (
                     <TableRow key={pump.id}>
                       <TableCell className="font-medium">{pump.name}</TableCell>
@@ -226,15 +239,29 @@ export default function MeterReading() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Input
-                          type="number"
-                          className="w-32 ml-auto"
-                          value={openings[pump.id] ?? existing?.opening_meter ?? carryOver}
-                          onChange={(e) =>
-                            setOpenings((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
-                          }
-                          placeholder="Opening"
-                        />
+                        <div className="flex items-center justify-end gap-1">
+                          <Input
+                            type="number"
+                            className="w-28"
+                            value={openings[pump.id] ?? existing?.opening_meter ?? carryOver}
+                            onChange={(e) =>
+                              setOpenings((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                            }
+                            placeholder="Opening"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 shrink-0"
+                            title="Reset to carry-over"
+                            onClick={() =>
+                              setOpenings((prev) => ({ ...prev, [pump.id]: Number(carryOver) }))
+                            }
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
@@ -243,6 +270,17 @@ export default function MeterReading() {
                           value={meters[pump.id] ?? ""}
                           onChange={(e) => setMeters((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))}
                           placeholder="Enter closing"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          className="w-24 ml-auto"
+                          value={rtts[pump.id] ?? existing?.rtt_usg ?? 0}
+                          onChange={(e) =>
+                            setRtts((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                          }
+                          placeholder="RTT"
                         />
                       </TableCell>
                       <TableCell className="text-right">
