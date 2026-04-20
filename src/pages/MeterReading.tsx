@@ -419,11 +419,14 @@ export default function MeterReading() {
                   stringRows.push(["AGO Subtotal", "", "", "", "", "", "", agoV.toLocaleString(), `$${agoS.toFixed(2)}`]);
                   stringRows.push(["Shift Total", "", "", "", "", "", "", tV.toLocaleString(), `$${tS.toFixed(2)}`]);
                   const shiftName = shifts?.find((s) => s.id === selectedShift)?.name ?? "";
-                  const branchName =
-                    branches?.find((b) => b.id === branchId)?.name ?? "";
+                  const branchRecord = branches?.find((b) => b.id === branchId);
+                  const branchName = branchRecord?.name ?? "";
+                  const branchAddress = [branchRecord?.location, branchRecord?.county]
+                    .filter(Boolean)
+                    .join(", ");
                   exportTableToPDF(
                     "Meter Readings Report",
-                    `${branchName ? branchName + " • " : ""}${shiftName} Shift • ${selectedDate}`,
+                    `${shiftName} Shift • ${selectedDate}`,
                     headers,
                     stringRows,
                     [
@@ -432,6 +435,11 @@ export default function MeterReading() {
                       { label: "PMS Volume", value: `${pmsV.toLocaleString()} USG` },
                       { label: "AGO Volume", value: `${agoV.toLocaleString()} USG` },
                     ],
+                    {
+                      companyName: companySettings?.company_name || "Forecourt Management System",
+                      branchName,
+                      branchAddress,
+                    },
                   );
                 }}
               >
