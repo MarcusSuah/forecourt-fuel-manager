@@ -95,10 +95,27 @@ export default function MeterReading() {
       if (!prevShiftId) return [];
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, closing_meter")
+        .select("pump_id, closing_meter, unit_price_usd")
         .eq("branch_id", branchId!)
         .eq("shift_id", prevShiftId)
         .eq("date", prevDate);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Attendants assigned to specific pumps for this shift+date
+  const { data: assignments } = useQuery({
+    queryKey: ["pump-attendant-assignments", branchId, selectedDate, selectedShift],
+    enabled: !!branchId && !!selectedShift,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendant_assignments")
+        .select("pump_id, attendant_id, attendants!inner(id, full_name, branch_id, is_active)")
+        .eq("date", selectedDate)
+        .eq("shift_id", selectedShift)
+        .eq("attendants.branch_id", branchId!)
+        .eq("attendants.is_active", true);
       if (error) throw error;
       return data;
     },
