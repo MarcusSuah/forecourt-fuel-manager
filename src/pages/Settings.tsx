@@ -18,8 +18,10 @@ import {
 import { toast } from "sonner";
 import {
   Settings as SettingsIcon, DollarSign, Droplets, Clock, Building2, Save, RefreshCw, Shield,
+  Upload, Image as ImageIcon, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { invalidatePDFHeaderCache } from "@/lib/pdf-header-info";
 
 interface SettingRow {
   id: string;
@@ -71,6 +73,8 @@ export default function Settings() {
   const [primaryCurrency, setPrimaryCurrency] = useState("USD");
   const [secondaryCurrency, setSecondaryCurrency] = useState("LRD");
   const [dateFormat, setDateFormat] = useState("yyyy-MM-dd");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Populate form when data loads
   useEffect(() => {
@@ -93,6 +97,7 @@ export default function Settings() {
       setPrimaryCurrency(prefSetting.value?.currency_primary || "USD");
       setSecondaryCurrency(prefSetting.value?.currency_secondary || "LRD");
       setDateFormat(prefSetting.value?.date_format || "yyyy-MM-dd");
+      setLogoUrl(prefSetting.value?.logo_url || "");
     }
   }, [prefSetting]);
 
