@@ -179,7 +179,7 @@ export default function ReconciliationAlerts() {
   };
 
   return (
-    <AppLayout>
+    <AppLayout title="Reconciliation Alerts" subtitle="Investigate and resolve flagged variance events">
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
