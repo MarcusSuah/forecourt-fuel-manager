@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
 import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -217,6 +218,12 @@ export default function MeterReading() {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Block in-app navigation (links, back/forward) when there are unsaved changes
+  useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have unsaved meter readings. Leave this page and discard changes?",
+  );
 
   // Compute current bad-row pump names (volume <= 0 from inputs or persisted readings).
   const getBadPumps = (): string[] => {
@@ -463,6 +470,7 @@ export default function MeterReading() {
                       { label: "AGO Volume", value: `${agoV.toLocaleString()} USG` },
                     ],
                     headerInfo,
+                    user?.profile?.full_name ?? user?.email ?? undefined,
                   );
                 }}
               >
