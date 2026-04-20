@@ -232,25 +232,39 @@ export default function Notifications() {
             : n.severity === "success" ? "bg-success/10 border-success/30 text-success"
             : "bg-muted/50 border-border text-foreground";
           return (
-            <button
+            <div
               key={n.id}
-              onClick={() => n.link && navigate(n.link)}
-              className={cn("w-full text-left flex items-start gap-3 p-3 rounded-lg border transition-colors hover:bg-muted/30", tone)}
+              className={cn("group w-full flex items-start gap-3 p-3 rounded-lg border transition-colors hover:bg-muted/30", tone)}
             >
-              <div className="h-8 w-8 rounded-full bg-background/60 flex items-center justify-center shrink-0">
-                <Icon className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-sm">{n.title}</p>
-                  <Badge variant="outline" className="text-[10px] shrink-0 capitalize">{n.severity}</Badge>
+              <button
+                type="button"
+                onClick={() => n.link && navigate(n.link)}
+                className="flex items-start gap-3 flex-1 min-w-0 text-left"
+              >
+                <div className="h-8 w-8 rounded-full bg-background/60 flex items-center justify-center shrink-0">
+                  <Icon className="h-4 w-4" />
                 </div>
-                <p className="text-xs mt-0.5 text-foreground/80">{n.description}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {n.branchName} · {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
-                </p>
-              </div>
-            </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-sm">{n.title}</p>
+                    <Badge variant="outline" className="text-[10px] shrink-0 capitalize">{n.severity}</Badge>
+                  </div>
+                  <p className="text-xs mt-0.5 text-foreground/80">{n.description}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {n.branchName} · {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
+                  </p>
+                </div>
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 opacity-60 hover:opacity-100"
+                title="Dismiss"
+                onClick={(e) => { e.stopPropagation(); dismiss({ key: n.id, type: n.type }); }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           );
         })}
       </div>
