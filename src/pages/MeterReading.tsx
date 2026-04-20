@@ -314,12 +314,17 @@ export default function MeterReading() {
               </CardTitle>
               <Button
                 size="sm"
-                onClick={() => saveMutation.mutate()}
+                onClick={handleSaveClick}
                 disabled={saveMutation.isPending}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saveMutation.isPending ? "Saving..." : "Save Readings"}
               </Button>
+              {lastSavedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Last saved at {format(lastSavedAt, "HH:mm")}
+                </span>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -335,30 +340,7 @@ export default function MeterReading() {
                     "Volume (USG)",
                     "Total (USD)",
                   ];
-                  const rows: (string | number)[][] = [];
-                  let tV = 0, tS = 0, pmsV = 0, pmsS = 0, agoV = 0, agoS = 0;
-                  (pumps ?? []).forEach((pump) => {
-                    const ex = existingReadings?.find((r) => r.pump_id === pump.id);
-                    const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
-                    const closingRaw = meters[pump.id] ?? ex?.closing_meter;
-                    const closing = closingRaw ?? "";
-                    const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
-                    const price = prices[pump.id] ?? ex?.unit_price_usd ?? getPrevPrice(pump.id);
-                    const aId = attendantSel[pump.id] ?? ex?.attendant_id ?? "";
-                    const aName = (branchAttendants ?? []).find((a) => a.id === aId)?.full_name ?? "";
-                    const volume = closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : 0;
-                    const total = volume * Number(price);
-                    if (volume > 0) {
-                      tV += volume; tS += total;
-                      if (pump.product_type === "PMS") { pmsV += volume; pmsS += total; }
-                      else { agoV += volume; agoS += total; }
-                    }
-                    rows.push([
-                      pump.name, pump.product_type, aName,
-                      Number(opening), closing === "" ? "" : Number(closing),
-                      Number(rtt), Number(price), volume, total.toFixed(2),
-                    ]);
-                  });
+                  const { rows, tV, tS, pmsV, pmsS, agoV, agoS } = buildExportRows();
                   rows.push(["PMS Subtotal", "", "", "", "", "", "", pmsV, pmsS.toFixed(2)]);
                   rows.push(["AGO Subtotal", "", "", "", "", "", "", agoV, agoS.toFixed(2)]);
                   rows.push(["Shift Total", "", "", "", "", "", "", tV, tS.toFixed(2)]);
@@ -371,6 +353,42 @@ export default function MeterReading() {
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const headers = [
+                    "Pump", "Product", "Attendant",
+                    "Opening", "Closing", "RTT (USG)",
+                    "Price (USD)", "Volume (USG)", "Total (USD)",
+                  ];
+                  const { rows, tV, tS, pmsV, pmsS, agoV, agoS } = buildExportRows();
+                  const stringRows = rows.map((r) =>
+                    r.map((c) => (typeof c === "number" ? c.toLocaleString() : String(c))),
+                  );
+                  stringRows.push(["PMS Subtotal", "", "", "", "", "", "", pmsV.toLocaleString(), `$${pmsS.toFixed(2)}`]);
+                  stringRows.push(["AGO Subtotal", "", "", "", "", "", "", agoV.toLocaleString(), `$${agoS.toFixed(2)}`]);
+                  stringRows.push(["Shift Total", "", "", "", "", "", "", tV.toLocaleString(), `$${tS.toFixed(2)}`]);
+                  const shiftName = shifts?.find((s) => s.id === selectedShift)?.name ?? "";
+                  const branchName =
+                    branches?.find((b) => b.id === branchId)?.name ?? "";
+                  exportTableToPDF(
+                    "Meter Readings Report",
+                    `${branchName ? branchName + " • " : ""}${shiftName} Shift • ${selectedDate}`,
+                    headers,
+                    stringRows,
+                    [
+                      { label: "Total Volume", value: `${tV.toLocaleString()} USG` },
+                      { label: "Total Sales", value: `$${tS.toFixed(2)}` },
+                      { label: "PMS Volume", value: `${pmsV.toLocaleString()} USG` },
+                      { label: "AGO Volume", value: `${agoV.toLocaleString()} USG` },
+                    ],
+                  );
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export PDF
               </Button>
             </div>
           </CardHeader>
