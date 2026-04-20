@@ -447,7 +447,7 @@ export default function MeterReading() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
                   const headers = [
                     "Pump", "Product", "Attendant",
                     "Opening", "Closing", "RTT (USG)",
@@ -462,10 +462,7 @@ export default function MeterReading() {
                   stringRows.push(["Shift Total", "", "", "", "", "", "", tV.toLocaleString(), `$${tS.toFixed(2)}`]);
                   const shiftName = shifts?.find((s) => s.id === selectedShift)?.name ?? "";
                   const branchRecord = branches?.find((b) => b.id === branchId);
-                  const branchName = branchRecord?.name ?? "";
-                  const branchAddress = [branchRecord?.location, branchRecord?.county]
-                    .filter(Boolean)
-                    .join(", ");
+                  const headerInfo = await buildPDFHeaderInfo(branchRecord);
                   exportTableToPDF(
                     "Meter Readings Report",
                     `${shiftName} Shift • ${selectedDate}`,
@@ -477,11 +474,7 @@ export default function MeterReading() {
                       { label: "PMS Volume", value: `${pmsV.toLocaleString()} USG` },
                       { label: "AGO Volume", value: `${agoV.toLocaleString()} USG` },
                     ],
-                    {
-                      companyName: companySettings?.company_name || "Forecourt Management System",
-                      branchName,
-                      branchAddress,
-                    },
+                    headerInfo,
                   );
                 }}
               >
