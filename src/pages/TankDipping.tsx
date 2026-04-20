@@ -509,6 +509,7 @@ export default function TankDipping() {
                   <TableHead>Closing Dip (USG)</TableHead>
                   <TableHead className="text-right">Sales (USG)</TableHead>
                   <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="text-right">7-day trend</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
