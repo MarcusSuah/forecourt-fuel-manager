@@ -284,10 +284,16 @@ export default function AdminLoginActivities() {
             >
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
+            <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!filtered.length}>
+              <Download className="h-4 w-4 mr-2" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={!filtered.length}>
+              <FileText className="h-4 w-4 mr-2" /> PDF
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card>
             <CardContent className="p-4">
               <p className="text-xs uppercase text-muted-foreground">Total sign-ins</p>
@@ -305,6 +311,24 @@ export default function AdminLoginActivities() {
           </Card>
           <Card>
             <CardContent className="p-4">
+              <p className="text-xs uppercase text-muted-foreground">New devices</p>
+              <p className="text-2xl font-bold flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-warning" />
+                {totals.newDevices}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className={totals.failed > 0 ? "border-destructive/40" : undefined}>
+            <CardContent className="p-4">
+              <p className="text-xs uppercase text-muted-foreground">Failed attempts</p>
+              <p className="text-2xl font-bold flex items-center gap-2">
+                <AlertTriangle className={`h-5 w-5 ${totals.failed > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+                <span className={totals.failed > 0 ? "text-destructive" : ""}>{totals.failed}</span>
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 col-span-2 lg:col-span-4">
               <p className="text-xs uppercase text-muted-foreground mb-2">By role</p>
               <div className="flex flex-wrap gap-1.5">
                 {totals.byRole.length === 0 ? (
