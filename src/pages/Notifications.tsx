@@ -117,9 +117,21 @@ export default function Notifications() {
       .on("postgres_changes", { event: "*", schema: "public", table: "shift_sales_reports" }, () => {
         queryClient.invalidateQueries({ queryKey: ["notifs-cash-variance"] });
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reconciliation_alerts" }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-recon-alerts"] });
+        const row: any = payload.new;
+        if (row && (!isDealer || row.branch_id === dealerBranchId)) {
+          desktopNotify("🚨 Critical Tank Loss Detected", {
+            tag: `recon-${row.id}`,
+            body: `Loss of ${Math.abs(Number(row.loss_usg)).toFixed(1)} USG at branch. Click to investigate.`,
+            requireInteraction: true,
+            onClick: () => navigate("/notifications"),
+          });
+        }
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [queryClient, desktopNotify, isDealer, dealerBranchId, navigate]);
 
   const notifications = useMemo<Notification[]>(() => {
     const list: Notification[] = [];
@@ -167,6 +179,19 @@ export default function Notifications() {
       });
     });
 
+    (reconAlerts ?? []).forEach((r: any) => {
+      list.push({
+        id: `recon-${r.id}`,
+        type: "reconciliation",
+        severity: "critical",
+        title: `🚨 Critical loss: ${(r.tanks as any)?.name ?? "Tank"}`,
+        description: `Loss of ${Math.abs(Number(r.loss_usg)).toFixed(1)} USG (threshold ${r.threshold_usg} USG). Supervisors notified.`,
+        branchName: (r.branches as any)?.name ?? "Unknown",
+        timestamp: r.created_at,
+        link: "/tanks",
+      });
+    });
+
     if (cashSales) {
       // Group by branch
       const byBranch = new Map<string, { name: string; cash: number; sales: number }>();
@@ -205,7 +230,7 @@ export default function Notifications() {
       if (sev[a.severity] !== sev[b.severity]) return sev[a.severity] - sev[b.severity];
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
-  }, [tanks, deliveries, cashSales, thresholds, dismissedKeys]);
+  }, [tanks, deliveries, cashSales, reconAlerts, thresholds, dismissedKeys]);
 
   const isLoading = tanksLoading || delsLoading;
 
@@ -215,6 +240,7 @@ export default function Notifications() {
     if (type === "tanks") return notifications.filter(n => n.type === "tank-critical" || n.type === "tank-low");
     if (type === "deliveries") return notifications.filter(n => n.type === "delivery");
     if (type === "cash") return notifications.filter(n => n.type === "cash-variance");
+    if (type === "reconciliation") return notifications.filter(n => n.type === "reconciliation");
     return notifications;
   };
 
