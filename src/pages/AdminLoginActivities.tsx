@@ -327,8 +327,8 @@ export default function AdminLoginActivities() {
               </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4 col-span-2 lg:col-span-4">
+          <Card className="col-span-2 lg:col-span-4">
+            <CardContent className="p-4">
               <p className="text-xs uppercase text-muted-foreground mb-2">By role</p>
               <div className="flex flex-wrap gap-1.5">
                 {totals.byRole.length === 0 ? (
@@ -425,6 +425,8 @@ export default function AdminLoginActivities() {
                       <TableHead>Role</TableHead>
                       <TableHead>When</TableHead>
                       <TableHead>At</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>IP</TableHead>
                       <TableHead className="max-w-[280px]">Device</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -432,7 +434,14 @@ export default function AdminLoginActivities() {
                     {filtered.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">
-                          {r.user_full_name ?? "—"}
+                          <div className="flex items-center gap-2">
+                            <span>{r.user_full_name ?? "—"}</span>
+                            {r.is_new_device && (
+                              <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30">
+                                <ShieldAlert className="h-3 w-3 mr-0.5" /> New device
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {r.user_email ?? "—"}
@@ -454,6 +463,85 @@ export default function AdminLoginActivities() {
                         </TableCell>
                         <TableCell className="text-xs whitespace-nowrap">
                           {format(new Date(r.created_at), "MMM d, HH:mm")}
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {r.city || r.country ? (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {[r.city, r.country].filter(Boolean).join(", ")}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.ip_address ?? "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">
+                          {r.user_agent ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Failed login attempts */}
+        <Card className={totals.failed > 0 ? "border-destructive/30" : undefined}>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className={`h-4 w-4 ${totals.failed > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+              Failed sign-in attempts
+              {totals.failed > 0 && (
+                <Badge variant="destructive" className="ml-1">{totals.failed}</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Wrong passwords, unknown emails, and other auth failures in this period.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {failedLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (failedRows ?? []).length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">
+                No failed sign-in attempts in this period.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Attempted email</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>When</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>IP</TableHead>
+                      <TableHead className="max-w-[280px]">Device</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(failedRows ?? []).map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-mono text-xs">{r.attempted_email ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs bg-destructive/10 text-destructive border-destructive/30">
+                            {r.failure_reason ?? "invalid_credentials"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {r.city || r.country ? [r.city, r.country].filter(Boolean).join(", ") : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.ip_address ?? "—"}
                         </TableCell>
                         <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">
                           {r.user_agent ?? "—"}
