@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Fuel, Mail, Lock, Eye, EyeOff, User, ShieldCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +22,25 @@ export default function Login() {
   const [selectedRole, setSelectedRole] = useState<string>("attendant");
   const navigate = useNavigate();
   const { user, isLoading: authLoading, signIn, signUp } = useAuth();
+
+  // Branded sign-in: fetch company name and logo from system preferences
+  const { data: branding } = useQuery({
+    queryKey: ["login-branding"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "system_preferences")
+        .maybeSingle();
+      const v = (data?.value as any) ?? {};
+      return {
+        companyName: (v.company_name as string | undefined) || "FMS",
+        logoUrl: (v.logo_url as string | undefined) || null,
+      };
+    },
+  });
+  const companyName = branding?.companyName ?? "FMS";
+  const logoUrl = branding?.logoUrl ?? null;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -67,11 +88,17 @@ export default function Login() {
         </div>
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary">
-              <Fuel className="h-6 w-6 text-sidebar-primary-foreground" />
-            </div>
+            {logoUrl ? (
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary/10 overflow-hidden">
+                <img src={logoUrl} alt={`${companyName} logo`} className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary">
+                <Fuel className="h-6 w-6 text-sidebar-primary-foreground" />
+              </div>
+            )}
             <div>
-              <h1 className="text-2xl font-bold text-sidebar-foreground">FMS</h1>
+              <h1 className="text-2xl font-bold text-sidebar-foreground">{companyName}</h1>
               <p className="text-sm text-sidebar-foreground/60">Forecourt Management</p>
             </div>
           </div>
@@ -97,11 +124,17 @@ export default function Login() {
       <div className="flex-1 flex items-center justify-center p-4 sm:p-8 bg-background">
         <div className="w-full max-w-md space-y-6 sm:space-y-8">
           <div className="lg:hidden flex items-center justify-center gap-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-              <Fuel className="h-6 w-6 text-primary-foreground" />
-            </div>
+            {logoUrl ? (
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 overflow-hidden">
+                <img src={logoUrl} alt={`${companyName} logo`} className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+                <Fuel className="h-6 w-6 text-primary-foreground" />
+              </div>
+            )}
             <div>
-              <h1 className="text-2xl font-bold text-foreground">FMS</h1>
+              <h1 className="text-2xl font-bold text-foreground">{companyName}</h1>
               <p className="text-sm text-muted-foreground">Forecourt Management</p>
             </div>
           </div>
