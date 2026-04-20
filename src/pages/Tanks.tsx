@@ -379,6 +379,11 @@ export default function Tanks() {
                 branch={(tank.branches as any)?.name ?? "Unknown"}
                 lastUpdated={getTimeSince(tank.updated_at)}
                 onEdit={() => handleEdit(tank)}
+                onShowHistory={() => setHistoryTank(tank)}
+                latestDipDate={breakdowns?.[tank.id]?.latestDipDate ?? null}
+                openingLevel={breakdowns?.[tank.id]?.opening ?? null}
+                deliveriesSinceDip={breakdowns?.[tank.id]?.deliveriesSince ?? null}
+                computedClosing={breakdowns?.[tank.id]?.closing ?? null}
               />
               <Button
                 variant="destructive"
@@ -395,6 +400,16 @@ export default function Tanks() {
             </div>
           ))}
         </div>
+      )}
+
+      {historyTank && (
+        <StockHistoryDialog
+          open={!!historyTank}
+          onOpenChange={(o) => !o && setHistoryTank(null)}
+          tankId={historyTank.id}
+          tankName={historyTank.name}
+          capacity={Number(historyTank.capacity_usg)}
+        />
       )}
     </AppLayout>
   );
