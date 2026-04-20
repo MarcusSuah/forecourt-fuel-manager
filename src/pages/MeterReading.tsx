@@ -189,6 +189,20 @@ export default function MeterReading() {
     return branchAttendants ?? [];
   };
 
+  const isRowSaved = (pumpId: string) => {
+    const ex = existingReadings?.find((r) => r.pump_id === pumpId);
+    if (!ex) return false;
+    const eq = (a: any, b: any) =>
+      a === undefined || a === null || Number(a) === Number(b);
+    return (
+      eq(openings[pumpId], ex.opening_meter) &&
+      eq(meters[pumpId], ex.closing_meter) &&
+      eq(rtts[pumpId], ex.rtt_usg) &&
+      eq(prices[pumpId], ex.unit_price_usd) &&
+      (attendantSel[pumpId] === undefined || attendantSel[pumpId] === ex.attendant_id)
+    );
+  };
+
   // Compute current bad-row pump names (volume <= 0 from inputs or persisted readings).
   const getBadPumps = (): string[] => {
     const bad: string[] = [];
