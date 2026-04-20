@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
+import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,36 @@ export default function MeterReading() {
     const id = setInterval(() => setNowTick(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  // Detect any unsaved edits
+  const hasUnsavedChanges = (() => {
+    if (!pumps) return false;
+    return (pumps ?? []).some((pump) => {
+      const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+      const dirty = (a: any, b: any) =>
+        a !== undefined && a !== null && Number(a) !== Number(b ?? 0);
+      const attendantDirty =
+        attendantSel[pump.id] !== undefined &&
+        attendantSel[pump.id] !== (ex?.attendant_id ?? "");
+      return (
+        dirty(openings[pump.id], ex?.opening_meter) ||
+        dirty(meters[pump.id], ex?.closing_meter) ||
+        dirty(rtts[pump.id], ex?.rtt_usg) ||
+        dirty(prices[pump.id], ex?.unit_price_usd) ||
+        attendantDirty
+      );
+    });
+  })();
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
