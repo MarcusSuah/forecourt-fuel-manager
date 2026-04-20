@@ -22,6 +22,7 @@ import { exportTableToPDF } from "@/lib/pdf-export";
 import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
+import { enqueue as enqueueSync, isOffline } from "@/lib/sync-queue";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -102,11 +103,35 @@ export default function CashReports() {
         notes: r.notes || null,
         created_by: user?.id,
       }));
-      const { error } = await supabase.from("cash_deposits").insert(inserts);
-      if (error) throw error;
+      const branchName = branches?.find(b => b.id === globalBranch)?.name ?? "branch";
+      const label = `Cash deposits: ${inserts.length} row${inserts.length === 1 ? "" : "s"} · ${branchName}`;
+
+      if (isOffline()) {
+        enqueueSync({ table: "cash_deposits", rows: inserts, label });
+        return { queued: true as const };
+      }
+
+      try {
+        const { error } = await supabase.from("cash_deposits").insert(inserts);
+        if (error) throw error;
+        return { queued: false as const };
+      } catch (err: any) {
+        // Network/fetch failures → enqueue. Non-network errors (RLS, validation) → surface.
+        const msg = String(err?.message ?? err).toLowerCase();
+        const isNetwork = msg.includes("failed to fetch") || msg.includes("network") || msg.includes("load failed");
+        if (isNetwork) {
+          enqueueSync({ table: "cash_deposits", rows: inserts, label });
+          return { queued: true as const };
+        }
+        throw err;
+      }
     },
-    onSuccess: () => {
-      toast.success("Cash deposits recorded successfully");
+    onSuccess: (result) => {
+      if (result?.queued) {
+        toast.success("Saved offline — will sync when you reconnect");
+      } else {
+        toast.success("Cash deposits recorded successfully");
+      }
       setRows([emptyRow(defaultExchangeRate)]);
       queryClient.invalidateQueries({ queryKey: ["cash-deposits"] });
     },

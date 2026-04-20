@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useDocumentBranding } from "@/hooks/useDocumentBranding";
+import { useEffect } from "react";
+import { installSyncListeners } from "@/lib/sync-queue";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Tanks from "./pages/Tanks";
@@ -37,6 +39,7 @@ const queryClient = new QueryClient();
 
 function AppShell() {
   useDocumentBranding();
+  useEffect(() => { installSyncListeners(); }, []);
   return (
     <AuthProvider>
       <TooltipProvider>
