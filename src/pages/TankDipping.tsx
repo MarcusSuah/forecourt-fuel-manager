@@ -294,6 +294,65 @@ export default function TankDipping() {
     },
   });
 
+  // 7-day variance trend per tank for sparklines
+  const { data: variance7d } = useQuery({
+    queryKey: ["variance-7d", branchId],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("stock_readings")
+        .select("tank_id, date, variance_usg, created_at")
+        .eq("branch_id", branchId!)
+        .gte("date", since)
+        .order("date", { ascending: true });
+      if (error) throw error;
+      // Aggregate variance by tank+date (sum across shifts on same day), then keep ordered list
+      const byTankDate: Record<string, Record<string, number>> = {};
+      (data ?? []).forEach((r: any) => {
+        const v = Number(r.variance_usg ?? 0);
+        byTankDate[r.tank_id] ??= {};
+        byTankDate[r.tank_id][r.date] = (byTankDate[r.tank_id][r.date] ?? 0) + v;
+      });
+      const result: Record<string, number[]> = {};
+      Object.entries(byTankDate).forEach(([tid, m]) => {
+        const days: number[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = format(subDays(new Date(), i), "yyyy-MM-dd");
+          days.push(m[d] ?? 0);
+        }
+        result[tid] = days;
+      });
+      return result;
+    },
+  });
+
+  // Resolve a reconciliation alert with optional note
+  const resolveMutation = useMutation({
+    mutationFn: async ({ alertId, note }: { alertId: string; note: string }) => {
+      const { error } = await supabase
+        .from("reconciliation_alerts")
+        .update({
+          resolved_at: new Date().toISOString(),
+          resolved_by: user?.id ?? null,
+          resolution_notes: note?.trim() ? note.trim() : null,
+        })
+        .eq("id", alertId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      toast.success("Alert resolved");
+      setResolveNotes((p) => {
+        const { [vars.alertId]: _, ...rest } = p;
+        return rest;
+      });
+      queryClient.invalidateQueries({ queryKey: ["recent-open-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["header-recon-alerts"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   return (
     <AppLayout title="Daily Tank Dipping" subtitle="Record opening and closing dip readings per shift">
       <Card className="mb-6">
