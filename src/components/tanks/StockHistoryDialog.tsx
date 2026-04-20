@@ -8,7 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus, ShieldAlert, AlertTriangle } from "lucide-react";
 import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCSV } from "@/lib/csv-export";
@@ -37,6 +38,7 @@ type HistoryEvent = {
 export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capacity }: StockHistoryDialogProps) {
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
   const [dateTo, setDateTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [reconThreshold, setReconThreshold] = useState<number>(50);
 
   const { data, isLoading } = useQuery({
     queryKey: ["tank-stock-history", tankId],
