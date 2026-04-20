@@ -139,8 +139,36 @@ export default function Settings() {
     if (!companyName.trim()) { toast.error("Company name required"); return; }
     updateSettingMutation.mutate({
       key: "system_preferences",
-      value: { company_name: companyName, currency_primary: primaryCurrency, currency_secondary: secondaryCurrency, date_format: dateFormat },
+      value: {
+        company_name: companyName,
+        currency_primary: primaryCurrency,
+        currency_secondary: secondaryCurrency,
+        date_format: dateFormat,
+        logo_url: logoUrl || undefined,
+      },
     });
+    invalidatePDFHeaderCache();
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) { toast.error("Logo must be under 2MB"); return; }
+    if (!file.type.startsWith("image/")) { toast.error("Select an image file"); return; }
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("employee-photos")
+        .upload(path, file, { upsert: true, cacheControl: "3600" });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("employee-photos").getPublicUrl(path);
+      setLogoUrl(data.publicUrl);
+      toast.success("Logo uploaded — click Save Preferences to apply");
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   if (!isAdmin) {
