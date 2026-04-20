@@ -225,10 +225,13 @@ export default function MeterReading() {
                 <TableRow>
                   <TableHead>Pump</TableHead>
                   <TableHead>Product</TableHead>
+                  <TableHead>Attendant</TableHead>
                   <TableHead className="text-right">Opening Meter</TableHead>
                   <TableHead className="text-right">Closing Meter</TableHead>
                   <TableHead className="text-right">RTT (USG)</TableHead>
+                  <TableHead className="text-right">Unit Price (USD)</TableHead>
                   <TableHead className="text-right">Volume (USG)</TableHead>
+                  <TableHead className="text-right">Total (USD)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -239,15 +242,47 @@ export default function MeterReading() {
                     openings[pump.id] ?? existing?.opening_meter ?? carryOver;
                   const closing = meters[pump.id] ?? existing?.closing_meter ?? "";
                   const rtt = rtts[pump.id] ?? existing?.rtt_usg ?? 0;
+                  const price = prices[pump.id] ?? existing?.unit_price_usd ?? 0;
+                  const attendantId =
+                    attendantSel[pump.id] ?? existing?.attendant_id ?? "";
                   const volume =
                     closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : null;
+                  const total = volume !== null ? volume * Number(price) : null;
+                  const isBad = volume !== null && volume <= 0;
                   return (
-                    <TableRow key={pump.id}>
-                      <TableCell className="font-medium">{pump.name}</TableCell>
+                    <TableRow
+                      key={pump.id}
+                      className={cn(isBad && "bg-destructive/10 hover:bg-destructive/15")}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {isBad && <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />}
+                          {pump.name}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={cn("text-xs", pump.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
                           {pump.product_type}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={attendantId}
+                          onValueChange={(v) =>
+                            setAttendantSel((prev) => ({ ...prev, [pump.id]: v }))
+                          }
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {branchAttendants?.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.full_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -294,12 +329,27 @@ export default function MeterReading() {
                           placeholder="RTT"
                         />
                       </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="w-24 ml-auto"
+                          value={prices[pump.id] ?? existing?.unit_price_usd ?? 0}
+                          onChange={(e) =>
+                            setPrices((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                          }
+                          placeholder="0.00"
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         {volume !== null && (
-                          <span className={cn("font-bold", volume >= 0 ? "text-foreground" : "text-destructive")}>
+                          <span className={cn("font-bold", isBad ? "text-destructive" : "text-foreground")}>
                             {volume.toLocaleString()}
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {total !== null ? `$${total.toFixed(2)}` : ""}
                       </TableCell>
                     </TableRow>
                   );
