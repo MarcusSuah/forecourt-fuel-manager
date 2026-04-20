@@ -53,6 +53,7 @@ export default function TankDipping() {
   const [dips, setDips] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
   const [thresholdDraft, setThresholdDraft] = useState<Record<string, string>>({});
+  const [resolveNotes, setResolveNotes] = useState<Record<string, string>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
