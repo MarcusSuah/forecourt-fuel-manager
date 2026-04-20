@@ -251,6 +251,9 @@ export default function Tanks() {
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Tank</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+              <strong className="text-foreground">Note:</strong> Current stock auto-syncs from the latest <em>closing dip</em> in Tank Dipping, plus any new fuel deliveries. Manual edits here may be overridden by the next dip reading.
+            </div>
             <div className="space-y-2">
               <Label>Tank Name *</Label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
@@ -263,6 +266,9 @@ export default function Tanks() {
               <div className="space-y-2">
                 <Label>Current Level (USG) *</Label>
                 <Input type="number" value={editCurrentLevel} onChange={(e) => setEditCurrentLevel(e.target.value)} />
+                {editCapacity && editCurrentLevel && parseFloat(editCurrentLevel) > parseFloat(editCapacity) && (
+                  <p className="text-xs text-destructive">Cannot exceed capacity</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
