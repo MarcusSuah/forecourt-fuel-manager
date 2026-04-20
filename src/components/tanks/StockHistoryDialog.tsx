@@ -434,6 +434,22 @@ export function StockHistoryDialog({
                         </Button>
                       ))}
                     </div>
+                    {canEditThreshold && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-9 ml-auto"
+                        onClick={() => saveThresholdMutation.mutate(reconThreshold)}
+                        disabled={saveThresholdMutation.isPending || reconThreshold === initialThreshold}
+                        title="Save this threshold for this tank (visible to all users)"
+                      >
+                        <Save className="h-3.5 w-3.5 mr-1" /> Save for tank
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 text-[11px] text-muted-foreground">
+                    <Bell className="h-3 w-3" />
+                    Critical events (loss &gt; {reconThreshold * 2} USG) auto-notify Admins, Supervisors, and the branch Dealer by email and SMS.
                   </div>
                 </div>
 
