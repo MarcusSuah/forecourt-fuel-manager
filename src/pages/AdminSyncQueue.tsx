@@ -54,12 +54,9 @@ export default function AdminSyncQueue() {
   const isAdmin = user?.role === "admin";
   const isSupervisor = user?.role === "supervisor";
 
-  if (user && !isAdmin && !isSupervisor) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const { data: rows, isLoading } = useQuery({
     queryKey: ["admin-sync-queue"],
+    enabled: isAdmin || isSupervisor,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sync_queue")
@@ -109,6 +106,11 @@ export default function AdminSyncQueue() {
     },
   });
 
+  // Access guard runs after all hooks have been called
+  if (user && !isAdmin && !isSupervisor) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const allSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.id));
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
@@ -123,7 +125,7 @@ export default function AdminSyncQueue() {
   const selectedIds = Array.from(selected);
 
   return (
-    <AppLayout>
+    <AppLayout title="Sync Queue" subtitle="Cross-user offline entry diagnostics">
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
