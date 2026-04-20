@@ -161,6 +161,7 @@ async function flushOne(id: string): Promise<void> {
     if (error) throw error;
     // Success — remove from queue
     write(read().filter((e) => e.id !== id));
+    void deleteMirror(id);
   } catch (err: any) {
     const message = err?.message ?? String(err);
     const current = read();
@@ -176,6 +177,72 @@ async function flushOne(id: string): Promise<void> {
       updatedAt: Date.now(),
     };
     write(current);
+    void updateMirror(id, { status, attempts, last_error: message });
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared-table mirroring (best-effort — failures are silently ignored) */
+/* ------------------------------------------------------------------ */
+
+async function getCurrentUser(): Promise<{ id: string; email: string | null } | null> {
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) return null;
+    return { id: data.user.id, email: data.user.email ?? null };
+  } catch {
+    return null;
+  }
+}
+
+async function mirrorToServer(entry: QueueEntry): Promise<void> {
+  try {
+    const u = await getCurrentUser();
+    if (!u) return;
+    await supabase.from("sync_queue").insert({
+      client_entry_id: entry.id,
+      user_id: u.id,
+      user_email: u.email,
+      target_table: entry.table,
+      payload: entry.rows as any,
+      label: entry.label,
+      status: entry.status === "syncing" ? "pending" : entry.status,
+      attempts: entry.attempts,
+      last_error: entry.lastError ?? null,
+    } as any);
+  } catch {
+    // ignore — admin mirror is best-effort
+  }
+}
+
+async function updateMirror(
+  clientEntryId: string,
+  patch: { status?: QueueEntryStatus | "succeeded"; attempts?: number; last_error?: string | null },
+): Promise<void> {
+  try {
+    const u = await getCurrentUser();
+    if (!u) return;
+    await supabase
+      .from("sync_queue")
+      .update(patch as any)
+      .eq("user_id", u.id)
+      .eq("client_entry_id", clientEntryId);
+  } catch {
+    // ignore
+  }
+}
+
+async function deleteMirror(clientEntryId: string): Promise<void> {
+  try {
+    const u = await getCurrentUser();
+    if (!u) return;
+    await supabase
+      .from("sync_queue")
+      .delete()
+      .eq("user_id", u.id)
+      .eq("client_entry_id", clientEntryId);
+  } catch {
+    // ignore
   }
 }
 
