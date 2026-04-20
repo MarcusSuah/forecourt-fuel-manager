@@ -101,10 +101,13 @@ export default function Tanks() {
       if (!editName.trim() || isNaN(capacity) || capacity <= 0 || isNaN(currentLevel) || currentLevel < 0) {
         throw new Error("Please fill all required fields with valid values");
       }
+      if (currentLevel > capacity) {
+        throw new Error(`Current level (${currentLevel}) cannot exceed tank capacity (${capacity})`);
+      }
       const { error } = await supabase.from("tanks").update({
         name: editName.trim(),
         capacity_usg: capacity,
-        current_level_usg: Math.min(currentLevel, capacity),
+        current_level_usg: currentLevel,
         threshold_usg: threshold,
       }).eq("id", editingTank.id);
       if (error) throw error;
