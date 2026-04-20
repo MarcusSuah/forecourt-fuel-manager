@@ -27,7 +27,9 @@ type Notification = {
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
+  const { dismissedKeys, dismiss, dismissMany, restoreAll } = useDismissedNotifications();
   const sevenDaysAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -81,6 +83,26 @@ export default function Notifications() {
       return { cash: cashRes.data ?? [], sales: salesRes.data ?? [] };
     },
   });
+
+  // Realtime: refresh notifications when underlying tables change
+  useEffect(() => {
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tanks" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-tanks"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "fuel_deliveries" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-deliveries"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_deposits" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-cash-variance"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "shift_sales_reports" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["notifs-cash-variance"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const notifications = useMemo<Notification[]>(() => {
     const list: Notification[] = [];
