@@ -142,6 +142,27 @@ export default function TankDipping() {
     return getCarryOverOpening(tankId);
   };
 
+  // Summary stats for selected shift
+  const summary = useMemo(() => {
+    const list = tanks ?? [];
+    let criticalCount = 0;
+    let totalAbsVariance = 0;
+    let withReading = 0;
+    list.forEach((t) => {
+      const opening = getOpeningDip(t.id);
+      const closingRaw = dips[t.id] ?? currentReadings?.find((r) => r.tank_id === t.id)?.physical_level_usg;
+      if (closingRaw === undefined || closingRaw === null || closingRaw === "") return;
+      withReading += 1;
+      const tankSales = opening - Number(closingRaw);
+      const meterSales = pumpSales?.[t.id] ?? 0;
+      const variance = tankSales - meterSales;
+      const threshold = Number(t.reconciliation_threshold_usg ?? 0);
+      totalAbsVariance += Math.abs(variance);
+      if (threshold > 0 && Math.abs(variance) > threshold) criticalCount += 1;
+    });
+    return { totalTanks: list.length, withReading, criticalCount, totalAbsVariance };
+  }, [tanks, dips, openings, currentReadings, pumpSales, prevDips]);
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!branchId || !selectedShift) throw new Error("Select branch and shift");
