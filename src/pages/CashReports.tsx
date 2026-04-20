@@ -299,6 +299,32 @@ export default function CashReports() {
                   todaysDeposits.map(d => [(d.attendants as any)?.full_name || "—", d.deposit_type, Number(d.amount), d.deposit_type === "LRD" ? Number(d.exchange_rate) : "—", Number(d.amount_usd).toFixed(2), d.notes || ""])
                 );
               }}><Download className="h-4 w-4 mr-1" /> CSV</Button>
+              <Button variant="outline" size="sm" onClick={async () => {
+                if (!todaysDeposits) return;
+                const branch = branches?.find((b) => b.id === globalBranch);
+                const shiftName = shifts?.find((s) => s.id === globalShift)?.name ?? "";
+                const headerInfo = await buildPDFHeaderInfo(branch);
+                exportTableToPDF(
+                  "Cash Deposits Report",
+                  `${shiftName} Shift • ${format(new Date(date), "MMMM dd, yyyy")}`,
+                  ["Attendant", "Type", "Amount", "Rate", "USD Equiv.", "Notes"],
+                  todaysDeposits.map((d) => [
+                    (d.attendants as any)?.full_name || "—",
+                    d.deposit_type,
+                    String(Number(d.amount).toLocaleString()),
+                    d.deposit_type === "LRD" ? String(Number(d.exchange_rate)) : "—",
+                    `$${Number(d.amount_usd).toFixed(2)}`,
+                    d.notes || "",
+                  ]),
+                  [
+                    { label: "LRD Cash", value: `L$${submittedTotals.lrd.toLocaleString()}` },
+                    { label: "USD Cash", value: `$${submittedTotals.usd.toLocaleString()}` },
+                    { label: "Card Sales", value: `$${submittedTotals.card.toLocaleString()}` },
+                    { label: "Total (USD)", value: `$${submittedTotals.totalUsd.toFixed(2)}` },
+                  ],
+                  headerInfo,
+                );
+              }}><Download className="h-4 w-4 mr-1" /> PDF</Button>
             </div>
           </CardHeader>
           <CardContent>
