@@ -12,11 +12,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Settings2, ExternalLink } from "lucide-react";
+import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Settings2, ExternalLink, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { Link } from "react-router-dom";
+
+// Tiny inline sparkline. Negative values are red, non-negative blue.
+function Sparkline({ values, width = 80, height = 24 }: { values: number[]; width?: number; height?: number }) {
+  if (!values || values.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const max = Math.max(...values.map((v) => Math.abs(v)), 1);
+  const stepX = values.length > 1 ? width / (values.length - 1) : width;
+  const points = values
+    .map((v, i) => {
+      const x = i * stepX;
+      const y = height / 2 - (v / max) * (height / 2 - 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const last = values[values.length - 1];
+  const stroke = last < 0 ? "hsl(var(--destructive))" : "hsl(var(--primary))";
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <line x1={0} y1={height / 2} x2={width} y2={height / 2} stroke="hsl(var(--border))" strokeDasharray="2,2" />
+      <polyline fill="none" stroke={stroke} strokeWidth={1.5} points={points} />
+    </svg>
+  );
+}
 
 export default function TankDipping() {
   const { user } = useAuth();
