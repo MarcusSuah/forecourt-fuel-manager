@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Gauge, RotateCcw, Save } from "lucide-react";
+import { AlertTriangle, Download, Gauge, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { downloadCSV } from "@/lib/csv-export";
 
 export default function MeterReading() {
   const { isDealer, dealerBranchId } = useDealerBranch();
@@ -247,6 +248,58 @@ export default function MeterReading() {
                 <Save className="h-4 w-4 mr-2" />
                 {saveMutation.isPending ? "Saving..." : "Save Readings"}
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const headers = [
+                    "Pump",
+                    "Product",
+                    "Attendant",
+                    "Opening Meter",
+                    "Closing Meter",
+                    "RTT (USG)",
+                    "Unit Price (USD)",
+                    "Volume (USG)",
+                    "Total (USD)",
+                  ];
+                  const rows: (string | number)[][] = [];
+                  let tV = 0, tS = 0, pmsV = 0, pmsS = 0, agoV = 0, agoS = 0;
+                  (pumps ?? []).forEach((pump) => {
+                    const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+                    const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
+                    const closingRaw = meters[pump.id] ?? ex?.closing_meter;
+                    const closing = closingRaw ?? "";
+                    const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
+                    const price = prices[pump.id] ?? ex?.unit_price_usd ?? getPrevPrice(pump.id);
+                    const aId = attendantSel[pump.id] ?? ex?.attendant_id ?? "";
+                    const aName = (branchAttendants ?? []).find((a) => a.id === aId)?.full_name ?? "";
+                    const volume = closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : 0;
+                    const total = volume * Number(price);
+                    if (volume > 0) {
+                      tV += volume; tS += total;
+                      if (pump.product_type === "PMS") { pmsV += volume; pmsS += total; }
+                      else { agoV += volume; agoS += total; }
+                    }
+                    rows.push([
+                      pump.name, pump.product_type, aName,
+                      Number(opening), closing === "" ? "" : Number(closing),
+                      Number(rtt), Number(price), volume, total.toFixed(2),
+                    ]);
+                  });
+                  rows.push(["PMS Subtotal", "", "", "", "", "", "", pmsV, pmsS.toFixed(2)]);
+                  rows.push(["AGO Subtotal", "", "", "", "", "", "", agoV, agoS.toFixed(2)]);
+                  rows.push(["Shift Total", "", "", "", "", "", "", tV, tS.toFixed(2)]);
+                  downloadCSV(
+                    `meter-readings-${selectedDate}-${selectedShift.slice(0, 8)}.csv`,
+                    headers,
+                    rows,
+                  );
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
@@ -268,6 +321,7 @@ export default function MeterReading() {
                 {(() => {
                   let totalVolume = 0;
                   let totalSales = 0;
+                  let pmsVolume = 0, pmsSales = 0, agoVolume = 0, agoSales = 0;
                   const rows = (pumps ?? []).map((pump) => {
                   const existing = existingReadings?.find((r) => r.pump_id === pump.id);
                   const carryOver = getOpeningMeter(pump.id);
@@ -288,6 +342,13 @@ export default function MeterReading() {
                   if (volume !== null && !isBad) {
                     totalVolume += volume;
                     totalSales += total ?? 0;
+                    if (pump.product_type === "PMS") {
+                      pmsVolume += volume;
+                      pmsSales += total ?? 0;
+                    } else {
+                      agoVolume += volume;
+                      agoSales += total ?? 0;
+                    }
                   }
                   return (
                     <TableRow
@@ -370,16 +431,25 @@ export default function MeterReading() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          className="w-24 ml-auto"
-                          value={prices[pump.id] ?? existing?.unit_price_usd ?? prevPrice}
-                          onChange={(e) =>
-                            setPrices((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
-                          }
-                          placeholder="0.00"
-                        />
+                        <div className="flex flex-col items-end gap-0.5">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="w-24"
+                            value={prices[pump.id] ?? existing?.unit_price_usd ?? prevPrice}
+                            onChange={(e) =>
+                              setPrices((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                            }
+                            placeholder="0.00"
+                          />
+                          {prices[pump.id] === undefined &&
+                            existing?.unit_price_usd === undefined &&
+                            prevPrice > 0 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                Carried from previous shift
+                              </span>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         {volume !== null && (
@@ -397,6 +467,30 @@ export default function MeterReading() {
                   return (
                     <>
                       {rows}
+                      <TableRow className="bg-muted/20">
+                        <TableCell colSpan={6} className="text-right text-fuel-pms font-medium">
+                          PMS Subtotal
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right text-fuel-pms">
+                          {pmsVolume.toLocaleString()} USG
+                        </TableCell>
+                        <TableCell className="text-right text-fuel-pms">
+                          ${pmsSales.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/20">
+                        <TableCell colSpan={6} className="text-right text-fuel-ago font-medium">
+                          AGO Subtotal
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right text-fuel-ago">
+                          {agoVolume.toLocaleString()} USG
+                        </TableCell>
+                        <TableCell className="text-right text-fuel-ago">
+                          ${agoSales.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
                       <TableRow data-totals className="font-semibold bg-muted/40">
                         <TableCell colSpan={6} className="text-right">
                           Shift Totals
