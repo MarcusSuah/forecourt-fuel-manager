@@ -405,6 +405,7 @@ export default function TankDipping() {
             </Table>
           </CardContent>
         </Card>
+        </>
       )}
     </AppLayout>
   );
