@@ -423,16 +423,25 @@ export default function MeterReading() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          className="w-24 ml-auto"
-                          value={prices[pump.id] ?? existing?.unit_price_usd ?? prevPrice}
-                          onChange={(e) =>
-                            setPrices((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
-                          }
-                          placeholder="0.00"
-                        />
+                        <div className="flex flex-col items-end gap-0.5">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="w-24"
+                            value={prices[pump.id] ?? existing?.unit_price_usd ?? prevPrice}
+                            onChange={(e) =>
+                              setPrices((prev) => ({ ...prev, [pump.id]: Number(e.target.value) }))
+                            }
+                            placeholder="0.00"
+                          />
+                          {prices[pump.id] === undefined &&
+                            existing?.unit_price_usd === undefined &&
+                            prevPrice > 0 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                Carried from previous shift
+                              </span>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         {volume !== null && (
