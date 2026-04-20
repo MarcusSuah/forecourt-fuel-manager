@@ -234,11 +234,11 @@ export default function ShiftStockReport() {
               <Button variant="outline" size="sm" onClick={() => {
                 const rows = reportData.flatMap((t) =>
                   t.pumps.length > 0
-                    ? t.pumps.map((p) => [t.tankName, t.productType, t.openingDip, t.closingDip, t.tankSales, p.name, p.openingMeter, p.closingMeter, p.meterSales, t.variance])
-                    : [[t.tankName, t.productType, t.openingDip, t.closingDip, t.tankSales, "—", 0, 0, 0, t.variance]]
+                    ? t.pumps.map((p) => [t.tankName, t.productType, t.openingDip, t.closingDip, t.deliveries, t.tankSales, p.name, p.openingMeter, p.closingMeter, p.meterSales, t.variance])
+                    : [[t.tankName, t.productType, t.openingDip, t.closingDip, t.deliveries, t.tankSales, "—", 0, 0, 0, t.variance]]
                 );
                 downloadCSV(`shift-stock-report-${selectedDate}-${shiftName}.csv`,
-                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
+                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Deliveries", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
                   rows
                 );
               }}>
@@ -254,6 +254,7 @@ export default function ShiftStockReport() {
                     ? t.pumps.map((p) => [
                         t.tankName, t.productType,
                         t.openingDip.toLocaleString(), t.closingDip.toLocaleString(),
+                        t.deliveries.toLocaleString(),
                         t.tankSales.toLocaleString(),
                         p.name,
                         Number(p.openingMeter).toLocaleString(),
@@ -261,16 +262,17 @@ export default function ShiftStockReport() {
                         p.meterSales.toLocaleString(),
                         `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`,
                       ])
-                    : [[t.tankName, t.productType, t.openingDip.toLocaleString(), t.closingDip.toLocaleString(), t.tankSales.toLocaleString(), "—", "0", "0", "0", `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`]]
+                    : [[t.tankName, t.productType, t.openingDip.toLocaleString(), t.closingDip.toLocaleString(), t.deliveries.toLocaleString(), t.tankSales.toLocaleString(), "—", "0", "0", "0", `${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()}`]]
                 );
                 const totalVariance = reportData.reduce((s, t) => s + t.variance, 0);
                 exportTableToPDF(
                   "Shift Stock Report",
                   `${shiftName} Shift • ${format(new Date(selectedDate), "MMMM dd, yyyy")}`,
-                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
+                  ["Tank", "Product", "Opening Dip", "Closing Dip", "Deliveries", "Tank Sales", "Pump", "Opening Meter", "Closing Meter", "Meter Sales", "Variance"],
                   rows,
                   [
                     { label: "Tanks", value: String(reportData.length) },
+                    { label: "Total Deliveries", value: `${reportData.reduce((s, t) => s + t.deliveries, 0).toLocaleString()} USG` },
                     { label: "Total Tank Sales", value: `${reportData.reduce((s, t) => s + t.tankSales, 0).toLocaleString()} USG` },
                     { label: "Total Meter Sales", value: `${reportData.reduce((s, t) => s + t.totalMeterSales, 0).toLocaleString()} USG` },
                     { label: "Net Variance", value: `${totalVariance >= 0 ? "+" : ""}${totalVariance.toLocaleString()} USG` },
@@ -313,6 +315,7 @@ export default function ShiftStockReport() {
                         <TableHead>Tank</TableHead>
                         <TableHead className="text-right">Opening Dip</TableHead>
                         <TableHead className="text-right">Closing Dip</TableHead>
+                        <TableHead className="text-right">Deliveries</TableHead>
                         <TableHead className="text-right">Tank Sales</TableHead>
                         <TableHead>Pump</TableHead>
                         <TableHead className="text-right">Opening Meter</TableHead>
@@ -331,6 +334,9 @@ export default function ShiftStockReport() {
                                   <TableCell rowSpan={tank.pumps.length} className="font-medium align-top">{tank.tankName}</TableCell>
                                   <TableCell rowSpan={tank.pumps.length} className="text-right align-top">{tank.openingDip.toLocaleString()}</TableCell>
                                   <TableCell rowSpan={tank.pumps.length} className="text-right align-top">{tank.closingDip.toLocaleString()}</TableCell>
+                                  <TableCell rowSpan={tank.pumps.length} className={cn("text-right align-top", tank.deliveries > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
+                                    {tank.deliveries > 0 ? `+${tank.deliveries.toLocaleString()}` : "—"}
+                                  </TableCell>
                                   <TableCell rowSpan={tank.pumps.length} className="text-right align-top font-medium">{tank.tankSales.toLocaleString()}</TableCell>
                                 </>
                               )}
@@ -350,6 +356,9 @@ export default function ShiftStockReport() {
                             <TableCell className="font-medium">{tank.tankName}</TableCell>
                             <TableCell className="text-right">{tank.openingDip.toLocaleString()}</TableCell>
                             <TableCell className="text-right">{tank.closingDip.toLocaleString()}</TableCell>
+                            <TableCell className={cn("text-right", tank.deliveries > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
+                              {tank.deliveries > 0 ? `+${tank.deliveries.toLocaleString()}` : "—"}
+                            </TableCell>
                             <TableCell className="text-right font-medium">{tank.tankSales.toLocaleString()}</TableCell>
                             <TableCell colSpan={3} className="text-center text-muted-foreground text-sm">No pumps assigned</TableCell>
                             <TableCell className="text-right">—</TableCell>
@@ -361,6 +370,7 @@ export default function ShiftStockReport() {
                         <TableCell>Total {product}</TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.openingDip, 0).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.closingDip, 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.deliveries, 0).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.tankSales, 0).toLocaleString()}</TableCell>
                         <TableCell colSpan={3}></TableCell>
                         <TableCell className="text-right">{productTanks.reduce((s, t) => s + t.totalMeterSales, 0).toLocaleString()}</TableCell>

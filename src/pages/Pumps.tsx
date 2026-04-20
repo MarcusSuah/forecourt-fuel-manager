@@ -13,8 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Fuel, Plus, Edit2, Power, Lock } from "lucide-react";
+import { Fuel, Plus, Edit2, Power, Lock, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ProductType = "PMS" | "AGO";
@@ -37,6 +38,12 @@ export default function Pumps() {
   const [fProduct, setFProduct] = useState<ProductType>("PMS");
   const [fTotalizers, setFTotalizers] = useState<number>(1);
   const [fActive, setFActive] = useState(true);
+  const [fTankIds, setFTankIds] = useState<string[]>([]);
+
+  // Copy dialog state
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copySource, setCopySource] = useState<string>("");
+  const [copyTarget, setCopyTarget] = useState<string>("");
 
   const { data: branches } = useQuery({
     queryKey: ["branches-for-pumps"],
@@ -66,6 +73,44 @@ export default function Pumps() {
     },
   });
 
+  // Tanks available for assignment in the pump form (same branch + product)
+  const { data: formTanks } = useQuery({
+    queryKey: ["tanks-for-pump-form", fBranch, fProduct],
+    enabled: !!fBranch && !!fProduct,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tanks")
+        .select("id, name, product_type, capacity_usg")
+        .eq("branch_id", fBranch)
+        .eq("product_type", fProduct)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Existing tank assignments for the pump being edited
+  const { data: existingAssignments } = useQuery({
+    queryKey: ["tank-pump-assignments-edit", editing?.id],
+    enabled: !!editing?.id && dialogOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tank_pump_assignments")
+        .select("tank_id")
+        .eq("pump_id", editing.id);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Sync selected tank ids when edit dialog loads existing assignments
+  useMemo(() => {
+    if (dialogOpen && editing?.id && existingAssignments) {
+      setFTankIds(existingAssignments.map((a: any) => a.tank_id));
+    }
+  }, [existingAssignments, dialogOpen, editing?.id]);
+
   const effectiveBranch = isDealer ? dealerBranchId ?? "" : filterBranch;
 
   const { data: pumps, isLoading } = useQuery({
@@ -91,6 +136,7 @@ export default function Pumps() {
       setFProduct(pump.product_type);
       setFTotalizers(pump.totalizers_count ?? 1);
       setFActive(pump.is_active);
+      setFTankIds([]); // will populate from existingAssignments query
     } else {
       setEditing(null);
       setFName("");
@@ -99,6 +145,7 @@ export default function Pumps() {
       setFProduct("PMS");
       setFTotalizers(1);
       setFActive(true);
+      setFTankIds([]);
     }
     setDialogOpen(true);
   };
@@ -115,12 +162,27 @@ export default function Pumps() {
         totalizers_count: Number(fTotalizers) || 1,
         is_active: fActive,
       };
+      let pumpId: string;
       if (editing?.id) {
         const { error } = await supabase.from("pumps").update(payload).eq("id", editing.id);
         if (error) throw error;
+        pumpId = editing.id;
       } else {
-        const { error } = await supabase.from("pumps").insert(payload);
+        const { data, error } = await supabase.from("pumps").insert(payload).select("id").single();
         if (error) throw error;
+        pumpId = data.id;
+      }
+
+      // Sync tank assignments: remove old (for this pump), insert current selection
+      const { error: delErr } = await supabase
+        .from("tank_pump_assignments")
+        .delete()
+        .eq("pump_id", pumpId);
+      if (delErr) throw delErr;
+      if (fTankIds.length > 0) {
+        const rows = fTankIds.map((tank_id) => ({ pump_id: pumpId, tank_id }));
+        const { error: insErr } = await supabase.from("tank_pump_assignments").insert(rows);
+        if (insErr) throw insErr;
       }
     },
     onSuccess: () => {
@@ -128,6 +190,53 @@ export default function Pumps() {
       setDialogOpen(false);
       qc.invalidateQueries({ queryKey: ["pumps-mgmt"] });
       qc.invalidateQueries({ queryKey: ["pumps-meter"] });
+      qc.invalidateQueries({ queryKey: ["tank-pump-assignments-report"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Copy pumps from one branch to another (recreates pump rows + tank assignments where matching tank names exist)
+  const copyMutation = useMutation({
+    mutationFn: async () => {
+      if (!copySource) throw new Error("Select a source branch");
+      if (!copyTarget) throw new Error("Select a target branch");
+      if (copySource === copyTarget) throw new Error("Source and target must differ");
+
+      const { data: srcPumps, error: e1 } = await supabase
+        .from("pumps")
+        .select("id, name, product_type, totalizers_count, is_active")
+        .eq("branch_id", copySource)
+        .eq("is_active", true);
+      if (e1) throw e1;
+      if (!srcPumps || srcPumps.length === 0) throw new Error("Source branch has no active pumps");
+
+      // Skip names already present in target branch
+      const { data: existing, error: e2 } = await supabase
+        .from("pumps")
+        .select("name")
+        .eq("branch_id", copyTarget);
+      if (e2) throw e2;
+      const existingNames = new Set((existing ?? []).map((p: any) => p.name.toLowerCase()));
+      const toCreate = srcPumps.filter((p: any) => !existingNames.has(p.name.toLowerCase()));
+      if (toCreate.length === 0) throw new Error("All pump names already exist in target branch");
+
+      const insertRows = toCreate.map((p: any) => ({
+        name: p.name,
+        branch_id: copyTarget,
+        product_type: p.product_type,
+        totalizers_count: p.totalizers_count,
+        is_active: true,
+      }));
+      const { error: e3 } = await supabase.from("pumps").insert(insertRows);
+      if (e3) throw e3;
+      return toCreate.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} pump${count === 1 ? "" : "s"} copied`);
+      setCopyOpen(false);
+      setCopySource("");
+      setCopyTarget("");
+      qc.invalidateQueries({ queryKey: ["pumps-mgmt"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -190,9 +299,16 @@ export default function Pumps() {
                 </Select>
               )}
               {canManage && (
-                <Button size="sm" onClick={() => openDialog()}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Pump
-                </Button>
+                <>
+                  {!isDealer && (
+                    <Button size="sm" variant="outline" onClick={() => setCopyOpen(true)}>
+                      <Copy className="h-4 w-4 mr-1" /> Copy Pumps
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={() => openDialog()}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Pump
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -306,12 +422,75 @@ export default function Pumps() {
                 </div>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Tank assignment is managed on the Tank Management page.</p>
+            <div className="space-y-2">
+              <Label>Assigned Tanks <span className="text-xs text-muted-foreground font-normal">({fProduct} only, same branch)</span></Label>
+              {!fBranch ? (
+                <p className="text-xs text-muted-foreground">Select a branch first.</p>
+              ) : (formTanks ?? []).length === 0 ? (
+                <p className="text-xs text-muted-foreground">No active {fProduct} tanks in this branch.</p>
+              ) : (
+                <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-2">
+                  {formTanks?.map((t: any) => {
+                    const checked = fTankIds.includes(t.id);
+                    return (
+                      <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) =>
+                            setFTankIds((prev) => (v ? [...prev, t.id] : prev.filter((x) => x !== t.id)))
+                          }
+                        />
+                        <span className="font-medium">{t.name}</span>
+                        <span className="text-xs text-muted-foreground">· {Number(t.capacity_usg).toLocaleString()} USG</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">One pump can be linked to multiple tanks of the same product.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? "Saving…" : editing ? "Save Changes" : "Add Pump"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Copy Pumps to Another Branch</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="space-y-2">
+              <Label>Source Branch</Label>
+              <Select value={copySource} onValueChange={setCopySource}>
+                <SelectTrigger><SelectValue placeholder="Copy pumps from…" /></SelectTrigger>
+                <SelectContent>
+                  {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Target Branch</Label>
+              <Select value={copyTarget} onValueChange={setCopyTarget}>
+                <SelectTrigger><SelectValue placeholder="Copy pumps to…" /></SelectTrigger>
+                <SelectContent>
+                  {branches?.filter((b) => b.id !== copySource).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Duplicates active pumps (name, product, totalizers) from source to target. Pumps with names that already exist in the target branch are skipped. Tank assignments are not copied.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCopyOpen(false)}>Cancel</Button>
+            <Button onClick={() => copyMutation.mutate()} disabled={copyMutation.isPending || !copySource || !copyTarget}>
+              {copyMutation.isPending ? "Copying…" : "Copy Pumps"}
             </Button>
           </DialogFooter>
         </DialogContent>
