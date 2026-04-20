@@ -19,6 +19,7 @@ import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
 import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -220,7 +221,7 @@ export default function MeterReading() {
   }, [hasUnsavedChanges]);
 
   // Block in-app navigation (links, back/forward) when there are unsaved changes
-  useUnsavedChangesGuard(
+  const { dialogProps: unsavedDialogProps } = useUnsavedChangesGuard(
     hasUnsavedChanges,
     "You have unsaved meter readings. Leave this page and discard changes?",
   );
