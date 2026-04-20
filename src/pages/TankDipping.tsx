@@ -151,7 +151,7 @@ export default function TankDipping() {
     list.forEach((t) => {
       const opening = getOpeningDip(t.id);
       const closingRaw = dips[t.id] ?? currentReadings?.find((r) => r.tank_id === t.id)?.physical_level_usg;
-      if (closingRaw === undefined || closingRaw === null || closingRaw === "") return;
+      if (closingRaw === undefined || closingRaw === null || (closingRaw as unknown) === "") return;
       withReading += 1;
       const tankSales = opening - Number(closingRaw);
       const meterSales = pumpSales?.[t.id] ?? 0;
