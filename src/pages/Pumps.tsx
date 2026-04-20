@@ -73,6 +73,44 @@ export default function Pumps() {
     },
   });
 
+  // Tanks available for assignment in the pump form (same branch + product)
+  const { data: formTanks } = useQuery({
+    queryKey: ["tanks-for-pump-form", fBranch, fProduct],
+    enabled: !!fBranch && !!fProduct,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tanks")
+        .select("id, name, product_type, capacity_usg")
+        .eq("branch_id", fBranch)
+        .eq("product_type", fProduct)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Existing tank assignments for the pump being edited
+  const { data: existingAssignments } = useQuery({
+    queryKey: ["tank-pump-assignments-edit", editing?.id],
+    enabled: !!editing?.id && dialogOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tank_pump_assignments")
+        .select("tank_id")
+        .eq("pump_id", editing.id);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Sync selected tank ids when edit dialog loads existing assignments
+  useMemo(() => {
+    if (dialogOpen && editing?.id && existingAssignments) {
+      setFTankIds(existingAssignments.map((a: any) => a.tank_id));
+    }
+  }, [existingAssignments, dialogOpen, editing?.id]);
+
   const effectiveBranch = isDealer ? dealerBranchId ?? "" : filterBranch;
 
   const { data: pumps, isLoading } = useQuery({
