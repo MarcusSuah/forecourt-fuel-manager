@@ -226,8 +226,11 @@ export default function TankDipping() {
               <TableBody>
                 {(tanks ?? []).map((tank) => {
                   const opening = getOpeningDip(tank.id);
-                  const closing = dips[tank.id] ?? currentReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? "";
-                  const variance = closing !== "" ? Number(closing) - opening : null;
+                  const closingRaw = dips[tank.id] ?? currentReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? "";
+                  const hasClosing = closingRaw !== "" && closingRaw !== null && closingRaw !== undefined;
+                  const tankSales = hasClosing ? opening - Number(closingRaw) : null;
+                  const meterSales = pumpSales?.[tank.id] ?? 0;
+                  const variance = tankSales !== null ? tankSales - meterSales : null;
                   return (
                     <TableRow key={tank.id}>
                       <TableCell className="font-medium">{tank.name}</TableCell>
@@ -237,19 +240,30 @@ export default function TankDipping() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">{Number(tank.capacity_usg).toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-medium">{opening.toLocaleString()}</TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           className="w-32"
-                          value={dips[tank.id] ?? ""}
+                          value={openings[tank.id] ?? opening}
+                          onChange={(e) => setOpenings((prev) => ({ ...prev, [tank.id]: Number(e.target.value) }))}
+                          placeholder="Opening dip"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          className="w-32"
+                          value={dips[tank.id] ?? (currentReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? "")}
                           onChange={(e) => setDips((prev) => ({ ...prev, [tank.id]: Number(e.target.value) }))}
                           placeholder="Enter dip"
                         />
                       </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {tankSales !== null ? tankSales.toLocaleString() : "—"}
+                      </TableCell>
                       <TableCell className="text-right">
                         {variance !== null && (
-                          <span className={cn("font-bold", variance >= 0 ? "text-success" : "text-destructive")}>
+                          <span className={cn("font-bold", Math.abs(variance) < 0.01 ? "text-success" : variance > 0 ? "text-warning" : "text-destructive")}>
                             {variance >= 0 ? "+" : ""}{variance.toLocaleString()}
                           </span>
                         )}
