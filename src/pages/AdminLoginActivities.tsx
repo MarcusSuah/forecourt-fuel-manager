@@ -204,8 +204,50 @@ export default function AdminLoginActivities() {
       const k = r.role ?? "unknown";
       byRole.set(k, (byRole.get(k) ?? 0) + 1);
     });
-    return { total: list.length, uniqueUsers, byRole: Array.from(byRole.entries()) };
-  }, [rows]);
+    const newDevices = list.filter((r) => r.is_new_device).length;
+    return {
+      total: list.length,
+      uniqueUsers,
+      newDevices,
+      failed: failedRows?.length ?? 0,
+      byRole: Array.from(byRole.entries()),
+    };
+  }, [rows, failedRows]);
+
+  const exportRows = useMemo(() => {
+    return (filtered ?? []).map((r) => [
+      r.user_full_name ?? "",
+      r.user_email ?? "",
+      r.role ?? "",
+      format(new Date(r.created_at), "yyyy-MM-dd HH:mm:ss"),
+      r.ip_address ?? "",
+      [r.city, r.country].filter(Boolean).join(", "),
+      r.is_new_device ? "Yes" : "No",
+      r.user_agent ?? "",
+    ]);
+  }, [filtered]);
+
+  const exportHeaders = ["User", "Email", "Role", "Signed in at", "IP", "Location", "New device", "Device"];
+
+  const handleExportCSV = () => {
+    const stamp = format(new Date(), "yyyyMMdd-HHmm");
+    downloadCSV(`login-activities-${range}-${stamp}.csv`, exportHeaders, exportRows);
+  };
+
+  const handleExportPDF = () => {
+    exportTableToPDF(
+      "Login Activities",
+      `${ranges.find((r) => r.key === range)?.label} • Generated ${format(new Date(), "PPpp")}`,
+      exportHeaders,
+      exportRows,
+      [
+        { label: "Total sign-ins", value: String(totals.total) },
+        { label: "Unique users", value: String(totals.uniqueUsers) },
+        { label: "New devices", value: String(totals.newDevices) },
+        { label: "Failed attempts", value: String(totals.failed) },
+      ],
+    );
+  };
 
   // Access guard runs after all hooks
   if (user && !isAdmin) {
