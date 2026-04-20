@@ -505,6 +505,14 @@ export default function MeterReading() {
                         <div className="flex items-center gap-2">
                           {isBad && <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />}
                           {pump.name}
+                          {isRowSaved(pump.id) && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] border-green-500/40 text-green-600 dark:text-green-400 px-1.5 py-0"
+                            >
+                              Saved
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
