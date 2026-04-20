@@ -27,6 +27,7 @@ export default function TankDipping() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [dips, setDips] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
+  const [thresholdDraft, setThresholdDraft] = useState<Record<string, string>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
