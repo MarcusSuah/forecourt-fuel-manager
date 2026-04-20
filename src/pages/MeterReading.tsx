@@ -141,6 +141,19 @@ export default function MeterReading() {
     return prev ? Number(prev.closing_meter) : 0;
   };
 
+  const getPrevPrice = (pumpId: string) => {
+    const prev = prevMeters?.find((m) => m.pump_id === pumpId);
+    return prev ? Number(prev.unit_price_usd) || 0 : 0;
+  };
+
+  const getPumpAttendants = (pumpId: string) => {
+    const assigned = (assignments ?? [])
+      .filter((a) => a.pump_id === pumpId)
+      .map((a: any) => ({ id: a.attendants.id, full_name: a.attendants.full_name }));
+    if (assigned.length > 0) return assigned;
+    return branchAttendants ?? [];
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!branchId || !selectedShift) throw new Error("Select branch and shift");
