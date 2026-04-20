@@ -508,7 +508,7 @@ export default function MeterReading() {
                           {isRowSaved(pump.id) && (
                             <Badge
                               variant="outline"
-                              className="text-[10px] border-fuel-ago/40 text-fuel-ago px-1.5 py-0"
+                              className="text-[10px] border-success/40 text-success px-1.5 py-0"
                             >
                               Saved
                             </Badge>
