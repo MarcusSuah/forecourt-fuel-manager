@@ -630,6 +630,11 @@ export default function TankDipping() {
                           </div>
                         )}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end" title="Daily variance USG (last 7 days)">
+                          <Sparkline values={variance7d?.[tank.id] ?? []} />
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
