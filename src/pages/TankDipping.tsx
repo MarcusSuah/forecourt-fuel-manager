@@ -231,9 +231,17 @@ export default function TankDipping() {
                   const tankSales = hasClosing ? opening - Number(closingRaw) : null;
                   const meterSales = pumpSales?.[tank.id] ?? 0;
                   const variance = tankSales !== null ? tankSales - meterSales : null;
+                  const threshold = Number(tank.reconciliation_threshold_usg ?? 0);
+                  const isCritical = variance !== null && threshold > 0 && Math.abs(variance) > threshold;
+                  const carryOver = getCarryOverOpening(tank.id);
                   return (
-                    <TableRow key={tank.id}>
-                      <TableCell className="font-medium">{tank.name}</TableCell>
+                    <TableRow key={tank.id} className={cn(isCritical && "bg-destructive/10 hover:bg-destructive/15")}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {isCritical && <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />}
+                          {tank.name}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={cn("text-xs", tank.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
                           {tank.product_type}
@@ -241,13 +249,25 @@ export default function TankDipping() {
                       </TableCell>
                       <TableCell className="text-right">{Number(tank.capacity_usg).toLocaleString()}</TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          className="w-32"
-                          value={openings[tank.id] ?? opening}
-                          onChange={(e) => setOpenings((prev) => ({ ...prev, [tank.id]: Number(e.target.value) }))}
-                          placeholder="Opening dip"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            className="w-32"
+                            value={openings[tank.id] ?? opening}
+                            onChange={(e) => setOpenings((prev) => ({ ...prev, [tank.id]: Number(e.target.value) }))}
+                            placeholder="Opening dip"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            title={`Reset to carry-over (${carryOver.toLocaleString()})`}
+                            onClick={() => setOpenings((prev) => ({ ...prev, [tank.id]: carryOver }))}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
@@ -258,14 +278,20 @@ export default function TankDipping() {
                           placeholder="Enter dip"
                         />
                       </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {tankSales !== null ? tankSales.toLocaleString() : "—"}
+                      <TableCell className="text-right">
+                        <div className="font-medium">{tankSales !== null ? tankSales.toLocaleString() : "—"}</div>
+                        <div className="text-xs text-muted-foreground">Meter: {meterSales.toLocaleString()}</div>
                       </TableCell>
                       <TableCell className="text-right">
                         {variance !== null && (
-                          <span className={cn("font-bold", Math.abs(variance) < 0.01 ? "text-success" : variance > 0 ? "text-warning" : "text-destructive")}>
-                            {variance >= 0 ? "+" : ""}{variance.toLocaleString()}
-                          </span>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className={cn("font-bold", isCritical ? "text-destructive" : Math.abs(variance) < 0.01 ? "text-success" : variance > 0 ? "text-warning" : "text-destructive")}>
+                              {variance >= 0 ? "+" : ""}{variance.toLocaleString()}
+                            </span>
+                            {threshold > 0 && (
+                              <span className="text-[10px] text-muted-foreground">Threshold: ±{threshold.toLocaleString()}</span>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
