@@ -15,7 +15,9 @@ import {
   Tabs, TabsList, TabsTrigger,
 } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, Loader2, RefreshCw, Search, Users } from "lucide-react";
+import { Activity, AlertTriangle, Download, FileText, Loader2, MapPin, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
+import { downloadCSV } from "@/lib/csv-export";
+import { exportTableToPDF } from "@/lib/pdf-export";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
@@ -31,6 +33,22 @@ type LoginRow = {
   user_full_name: string | null;
   role: string | null;
   user_agent: string | null;
+  created_at: string;
+  ip_address: string | null;
+  country: string | null;
+  city: string | null;
+  device_fingerprint: string | null;
+  is_new_device: boolean;
+};
+
+type FailedRow = {
+  id: string;
+  attempted_email: string | null;
+  ip_address: string | null;
+  country: string | null;
+  city: string | null;
+  user_agent: string | null;
+  failure_reason: string | null;
   created_at: string;
 };
 
@@ -89,6 +107,21 @@ export default function AdminLoginActivities() {
     },
   });
 
+  const { data: failedRows, isLoading: failedLoading } = useQuery({
+    queryKey: ["admin-failed-logins", range],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("failed_login_attempts")
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return (data ?? []) as FailedRow[];
+    },
+  });
+
   // Realtime: new logins push toast + refresh
   useEffect(() => {
     if (!isAdmin) return;
@@ -100,10 +133,23 @@ export default function AdminLoginActivities() {
         (payload) => {
           const row = payload.new as LoginRow;
           toast({
-            title: "New sign-in",
-            description: `${row.user_full_name ?? row.user_email ?? "A user"} just signed in${row.role ? ` as ${row.role}` : ""}.`,
+            title: row.is_new_device ? "New sign-in (new device)" : "New sign-in",
+            description: `${row.user_full_name ?? row.user_email ?? "A user"} signed in${row.role ? ` as ${row.role}` : ""}${row.city || row.country ? ` from ${[row.city, row.country].filter(Boolean).join(", ")}` : ""}.`,
           });
           qc.invalidateQueries({ queryKey: ["admin-login-activities"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "failed_login_attempts" },
+        (payload) => {
+          const row = payload.new as FailedRow;
+          toast({
+            variant: "destructive",
+            title: "Failed sign-in attempt",
+            description: `${row.attempted_email ?? "Unknown user"}${row.city || row.country ? ` from ${[row.city, row.country].filter(Boolean).join(", ")}` : ""} — ${row.failure_reason ?? "invalid credentials"}.`,
+          });
+          qc.invalidateQueries({ queryKey: ["admin-failed-logins"] });
         },
       )
       .subscribe();
@@ -158,8 +204,50 @@ export default function AdminLoginActivities() {
       const k = r.role ?? "unknown";
       byRole.set(k, (byRole.get(k) ?? 0) + 1);
     });
-    return { total: list.length, uniqueUsers, byRole: Array.from(byRole.entries()) };
-  }, [rows]);
+    const newDevices = list.filter((r) => r.is_new_device).length;
+    return {
+      total: list.length,
+      uniqueUsers,
+      newDevices,
+      failed: failedRows?.length ?? 0,
+      byRole: Array.from(byRole.entries()),
+    };
+  }, [rows, failedRows]);
+
+  const exportRows = useMemo(() => {
+    return (filtered ?? []).map((r) => [
+      r.user_full_name ?? "",
+      r.user_email ?? "",
+      r.role ?? "",
+      format(new Date(r.created_at), "yyyy-MM-dd HH:mm:ss"),
+      r.ip_address ?? "",
+      [r.city, r.country].filter(Boolean).join(", "),
+      r.is_new_device ? "Yes" : "No",
+      r.user_agent ?? "",
+    ]);
+  }, [filtered]);
+
+  const exportHeaders = ["User", "Email", "Role", "Signed in at", "IP", "Location", "New device", "Device"];
+
+  const handleExportCSV = () => {
+    const stamp = format(new Date(), "yyyyMMdd-HHmm");
+    downloadCSV(`login-activities-${range}-${stamp}.csv`, exportHeaders, exportRows);
+  };
+
+  const handleExportPDF = () => {
+    exportTableToPDF(
+      "Login Activities",
+      `${ranges.find((r) => r.key === range)?.label} • Generated ${format(new Date(), "PPpp")}`,
+      exportHeaders,
+      exportRows,
+      [
+        { label: "Total sign-ins", value: String(totals.total) },
+        { label: "Unique users", value: String(totals.uniqueUsers) },
+        { label: "New devices", value: String(totals.newDevices) },
+        { label: "Failed attempts", value: String(totals.failed) },
+      ],
+    );
+  };
 
   // Access guard runs after all hooks
   if (user && !isAdmin) {
@@ -196,10 +284,16 @@ export default function AdminLoginActivities() {
             >
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
+            <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={!filtered.length}>
+              <Download className="h-4 w-4 mr-2" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={!filtered.length}>
+              <FileText className="h-4 w-4 mr-2" /> PDF
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card>
             <CardContent className="p-4">
               <p className="text-xs uppercase text-muted-foreground">Total sign-ins</p>
@@ -216,6 +310,24 @@ export default function AdminLoginActivities() {
             </CardContent>
           </Card>
           <Card>
+            <CardContent className="p-4">
+              <p className="text-xs uppercase text-muted-foreground">New devices</p>
+              <p className="text-2xl font-bold flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-warning" />
+                {totals.newDevices}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className={totals.failed > 0 ? "border-destructive/40" : undefined}>
+            <CardContent className="p-4">
+              <p className="text-xs uppercase text-muted-foreground">Failed attempts</p>
+              <p className="text-2xl font-bold flex items-center gap-2">
+                <AlertTriangle className={`h-5 w-5 ${totals.failed > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+                <span className={totals.failed > 0 ? "text-destructive" : ""}>{totals.failed}</span>
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="col-span-2 lg:col-span-4">
             <CardContent className="p-4">
               <p className="text-xs uppercase text-muted-foreground mb-2">By role</p>
               <div className="flex flex-wrap gap-1.5">
@@ -313,6 +425,8 @@ export default function AdminLoginActivities() {
                       <TableHead>Role</TableHead>
                       <TableHead>When</TableHead>
                       <TableHead>At</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>IP</TableHead>
                       <TableHead className="max-w-[280px]">Device</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -320,7 +434,14 @@ export default function AdminLoginActivities() {
                     {filtered.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">
-                          {r.user_full_name ?? "—"}
+                          <div className="flex items-center gap-2">
+                            <span>{r.user_full_name ?? "—"}</span>
+                            {r.is_new_device && (
+                              <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30">
+                                <ShieldAlert className="h-3 w-3 mr-0.5" /> New device
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {r.user_email ?? "—"}
@@ -342,6 +463,85 @@ export default function AdminLoginActivities() {
                         </TableCell>
                         <TableCell className="text-xs whitespace-nowrap">
                           {format(new Date(r.created_at), "MMM d, HH:mm")}
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {r.city || r.country ? (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {[r.city, r.country].filter(Boolean).join(", ")}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.ip_address ?? "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">
+                          {r.user_agent ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Failed login attempts */}
+        <Card className={totals.failed > 0 ? "border-destructive/30" : undefined}>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className={`h-4 w-4 ${totals.failed > 0 ? "text-destructive" : "text-muted-foreground"}`} />
+              Failed sign-in attempts
+              {totals.failed > 0 && (
+                <Badge variant="destructive" className="ml-1">{totals.failed}</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Wrong passwords, unknown emails, and other auth failures in this period.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {failedLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (failedRows ?? []).length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">
+                No failed sign-in attempts in this period.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Attempted email</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>When</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>IP</TableHead>
+                      <TableHead className="max-w-[280px]">Device</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(failedRows ?? []).map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-mono text-xs">{r.attempted_email ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs bg-destructive/10 text-destructive border-destructive/30">
+                            {r.failure_reason ?? "invalid_credentials"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {r.city || r.country ? [r.city, r.country].filter(Boolean).join(", ") : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.ip_address ?? "—"}
                         </TableCell>
                         <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">
                           {r.user_agent ?? "—"}

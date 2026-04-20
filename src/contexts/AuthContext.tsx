@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Database } from "@/integrations/supabase/types";
+import { getDeviceFingerprint } from "@/lib/device-fingerprint";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -80,12 +81,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Record login activity (only on actual sign-in, not token refresh)
             if (event === "SIGNED_IN") {
               try {
-                await supabase.from("login_activities").insert({
-                  user_id: newSession.user.id,
-                  user_email: newSession.user.email ?? null,
-                  user_full_name: details.profile?.full_name ?? null,
-                  role: details.role ?? null,
-                  user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+                await supabase.functions.invoke("capture-login-context", {
+                  body: {
+                    mode: "success",
+                    user_id: newSession.user.id,
+                    user_email: newSession.user.email ?? null,
+                    user_full_name: details.profile?.full_name ?? null,
+                    role: details.role ?? null,
+                    user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+                    device_fingerprint: getDeviceFingerprint(),
+                  },
                 });
               } catch (err) {
                 console.warn("[auth] login activity insert failed:", err);
@@ -107,6 +112,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      // Fire-and-forget — record failed attempt for admin audit
+      supabase.functions
+        .invoke("capture-login-context", {
+          body: {
+            mode: "failure",
+            attempted_email: email,
+            user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+            failure_reason: error.message ?? "invalid_credentials",
+          },
+        })
+        .catch((e) => console.warn("[auth] failed attempt log failed:", e));
+    }
     return { error: error as Error | null };
   };
 

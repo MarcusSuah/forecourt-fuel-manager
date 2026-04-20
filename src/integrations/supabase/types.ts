@@ -407,6 +407,39 @@ export type Database = {
           },
         ]
       }
+      failed_login_attempts: {
+        Row: {
+          attempted_email: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_email?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_email?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       financial_assets: {
         Row: {
           branch_id: string | null
@@ -645,8 +678,13 @@ export type Database = {
       }
       login_activities: {
         Row: {
+          city: string | null
+          country: string | null
           created_at: string
+          device_fingerprint: string | null
           id: string
+          ip_address: string | null
+          is_new_device: boolean
           role: string | null
           user_agent: string | null
           user_email: string | null
@@ -654,8 +692,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          city?: string | null
+          country?: string | null
           created_at?: string
+          device_fingerprint?: string | null
           id?: string
+          ip_address?: string | null
+          is_new_device?: boolean
           role?: string | null
           user_agent?: string | null
           user_email?: string | null
@@ -663,8 +706,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          city?: string | null
+          country?: string | null
           created_at?: string
+          device_fingerprint?: string | null
           id?: string
+          ip_address?: string | null
+          is_new_device?: boolean
           role?: string | null
           user_agent?: string | null
           user_email?: string | null
