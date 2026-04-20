@@ -13,8 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Fuel, Plus, Edit2, Power, Lock } from "lucide-react";
+import { Fuel, Plus, Edit2, Power, Lock, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ProductType = "PMS" | "AGO";
@@ -37,6 +38,12 @@ export default function Pumps() {
   const [fProduct, setFProduct] = useState<ProductType>("PMS");
   const [fTotalizers, setFTotalizers] = useState<number>(1);
   const [fActive, setFActive] = useState(true);
+  const [fTankIds, setFTankIds] = useState<string[]>([]);
+
+  // Copy dialog state
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copySource, setCopySource] = useState<string>("");
+  const [copyTarget, setCopyTarget] = useState<string>("");
 
   const { data: branches } = useQuery({
     queryKey: ["branches-for-pumps"],
