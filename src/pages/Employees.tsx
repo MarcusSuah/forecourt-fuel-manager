@@ -28,6 +28,8 @@ import { exportTableToPDF } from "@/lib/pdf-export";
 import { format, differenceInYears } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EmployeeIDCard, BulkPrintIDCards } from "@/components/employees/EmployeeIDCard";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 const POSITIONS = [
   "Station Manager", "Supervisor", "Cashier", "Pump Attendant",
@@ -189,8 +191,26 @@ export default function Employees() {
   const getAge = (dob: string | null) => dob ? differenceInYears(new Date(), new Date(dob)) : "—";
   const getYearsOfService = (empDate: string) => differenceInYears(new Date(), new Date(empDate));
 
+  // Unsaved-changes guard for the Add/Edit Employee dialog
+  const hasUnsavedChanges = open && (
+    !!photoFile ||
+    form.full_name !== emptyForm.full_name ||
+    form.position !== emptyForm.position ||
+    form.date_of_birth !== emptyForm.date_of_birth ||
+    form.employment_date !== emptyForm.employment_date ||
+    form.gender !== emptyForm.gender ||
+    form.gross_salary !== emptyForm.gross_salary ||
+    form.social_security_number !== emptyForm.social_security_number ||
+    form.phone !== emptyForm.phone
+  );
+  const { dialogProps: guardDialog } = useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have unsaved employee changes. Leave without saving?"
+  );
+
   return (
     <AppLayout title="Employees" subtitle="Manage employee records and HR data">
+      <UnsavedChangesDialog {...guardDialog} />
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-3 justify-between">
           <div className="flex flex-col sm:flex-row gap-3 flex-1">

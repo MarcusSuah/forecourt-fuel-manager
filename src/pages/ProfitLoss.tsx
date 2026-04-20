@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { Plus, TrendingUp, TrendingDown, ArrowUpDown, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -95,8 +97,17 @@ export default function ProfitLoss() {
 
   const status = totals.profit > 0 ? "Profit" : totals.profit < 0 ? "Loss" : "Break-even";
 
+  const hasUnsavedChanges = open && Boolean(
+    form.category || form.description || form.amount || form.date || form.branch_id
+  );
+  const { dialogProps: guardDialog } = useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have an in-progress P&L entry. Leave without saving?"
+  );
+
   return (
     <AppLayout title="Profit & Loss" subtitle="Track income and expenditure across your operations">
+      <UnsavedChangesDialog {...guardDialog} />
       <div className="space-y-4">
         {/* Controls */}
         <Card>
