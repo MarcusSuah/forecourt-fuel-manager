@@ -217,8 +217,9 @@ export default function TankDipping() {
                   <TableHead>Tank</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead className="text-right">Capacity (USG)</TableHead>
-                  <TableHead className="text-right">Opening Dip (USG)</TableHead>
+                  <TableHead>Opening Dip (USG)</TableHead>
                   <TableHead>Closing Dip (USG)</TableHead>
+                  <TableHead className="text-right">Sales (USG)</TableHead>
                   <TableHead className="text-right">Variance</TableHead>
                 </TableRow>
               </TableHeader>
