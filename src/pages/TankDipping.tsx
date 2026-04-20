@@ -142,10 +142,32 @@ export default function TankDipping() {
     return getCarryOverOpening(tankId);
   };
 
+  // Summary stats for selected shift
+  const summary = useMemo(() => {
+    const list = tanks ?? [];
+    let criticalCount = 0;
+    let totalAbsVariance = 0;
+    let withReading = 0;
+    list.forEach((t) => {
+      const opening = getOpeningDip(t.id);
+      const closingRaw = dips[t.id] ?? currentReadings?.find((r) => r.tank_id === t.id)?.physical_level_usg;
+      if (closingRaw === undefined || closingRaw === null || (closingRaw as unknown) === "") return;
+      withReading += 1;
+      const tankSales = opening - Number(closingRaw);
+      const meterSales = pumpSales?.[t.id] ?? 0;
+      const variance = tankSales - meterSales;
+      const threshold = Number(t.reconciliation_threshold_usg ?? 0);
+      totalAbsVariance += Math.abs(variance);
+      if (threshold > 0 && Math.abs(variance) > threshold) criticalCount += 1;
+    });
+    return { totalTanks: list.length, withReading, criticalCount, totalAbsVariance };
+  }, [tanks, dips, openings, currentReadings, pumpSales, prevDips]);
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!branchId || !selectedShift) throw new Error("Select branch and shift");
-      const entries = (tanks ?? [])
+      const tanksToSave = (tanks ?? []).filter((t) => dips[t.id] !== undefined);
+      const entries = tanksToSave
         .filter((t) => dips[t.id] !== undefined)
         .map((t) => ({
           branch_id: branchId,
@@ -157,12 +179,53 @@ export default function TankDipping() {
           created_by: user?.id,
         }));
       if (entries.length === 0) throw new Error("Enter at least one dip reading");
-      const { error } = await supabase.from("stock_readings").upsert(entries, { onConflict: "branch_id,tank_id,shift_id,date" });
+      const { data: saved, error } = await supabase
+        .from("stock_readings")
+        .upsert(entries, { onConflict: "branch_id,tank_id,shift_id,date" })
+        .select("id, tank_id");
       if (error) throw error;
+
+      // Auto-dispatch critical reconciliation alerts
+      const branchName = branches?.find((b) => b.id === branchId)?.name ?? "Branch";
+      const criticals = tanksToSave
+        .map((t) => {
+          const opening = getOpeningDip(t.id);
+          const closing = Number(dips[t.id]);
+          const tankSales = opening - closing;
+          const meterSales = pumpSales?.[t.id] ?? 0;
+          const variance = tankSales - meterSales;
+          const threshold = Number(t.reconciliation_threshold_usg ?? 0);
+          return { tank: t, variance, threshold };
+        })
+        .filter((x) => x.threshold > 0 && Math.abs(x.variance) > x.threshold);
+
+      await Promise.all(
+        criticals.map(({ tank, variance, threshold }) => {
+          const stockReadingId = saved?.find((s) => s.tank_id === tank.id)?.id;
+          return supabase.functions.invoke("send-reconciliation-alert", {
+            body: {
+              tank_id: tank.id,
+              branch_id: branchId,
+              tank_name: tank.name,
+              branch_name: branchName,
+              product_type: tank.product_type,
+              loss_usg: variance < 0 ? variance : -Math.abs(variance),
+              threshold_usg: threshold,
+              stock_reading_id: stockReadingId,
+              dip_date: selectedDate,
+            },
+          });
+        })
+      );
+      return { criticalCount: criticals.length };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success("Dip readings saved");
+      if (res?.criticalCount) {
+        toast.warning(`${res.criticalCount} critical variance alert(s) dispatched`);
+      }
       queryClient.invalidateQueries({ queryKey: ["current-dips"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation-alerts"] });
       setDips({});
       setOpenings({});
     },
@@ -199,7 +262,48 @@ export default function TankDipping() {
       </Card>
 
       {branchId && selectedShift && (
-        <Card>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Tanks</p>
+                    <p className="text-2xl font-bold">{summary.totalTanks}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{summary.withReading} with readings</p>
+                  </div>
+                  <Droplets className="h-8 w-8 text-primary opacity-70" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={cn(summary.criticalCount > 0 && "border-destructive/50 bg-destructive/5")}>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Critical Variances</p>
+                    <p className={cn("text-2xl font-bold", summary.criticalCount > 0 && "text-destructive")}>
+                      {summary.criticalCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Over tank threshold</p>
+                  </div>
+                  <AlertTriangle className={cn("h-8 w-8 opacity-70", summary.criticalCount > 0 ? "text-destructive" : "text-muted-foreground")} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total |Variance|</p>
+                    <p className="text-2xl font-bold">{summary.totalAbsVariance.toLocaleString(undefined, { maximumFractionDigits: 1 })}</p>
+                    <p className="text-xs text-muted-foreground mt-1">USG across all tanks</p>
+                  </div>
+                  <TrendingDown className="h-8 w-8 text-warning opacity-70" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
@@ -301,6 +405,7 @@ export default function TankDipping() {
             </Table>
           </CardContent>
         </Card>
+        </>
       )}
     </AppLayout>
   );
