@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Gauge, RotateCcw, Save } from "lucide-react";
+import { AlertTriangle, Download, Gauge, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { downloadCSV } from "@/lib/csv-export";
 
 export default function MeterReading() {
   const { isDealer, dealerBranchId } = useDealerBranch();
