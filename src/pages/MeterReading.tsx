@@ -167,6 +167,66 @@ export default function MeterReading() {
     return branchAttendants ?? [];
   };
 
+  // Compute current bad-row pump names (volume <= 0 from inputs or persisted readings).
+  const getBadPumps = (): string[] => {
+    const bad: string[] = [];
+    (pumps ?? []).forEach((pump) => {
+      const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+      const closingRaw = meters[pump.id] ?? ex?.closing_meter;
+      if (closingRaw === undefined || closingRaw === null || closingRaw === "") return;
+      const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
+      const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
+      const volume = Number(closingRaw) - Number(opening) - Number(rtt);
+      if (volume <= 0) bad.push(pump.name);
+    });
+    return bad;
+  };
+
+  const handleSaveClick = () => {
+    if (getBadPumps().length > 0) {
+      setConfirmOpen(true);
+    } else {
+      saveMutation.mutate();
+    }
+  };
+
+  const lastSavedAt = (() => {
+    if (!existingReadings || existingReadings.length === 0) return null;
+    const max = existingReadings.reduce((acc, r: any) => {
+      const t = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+      return t > acc ? t : acc;
+    }, 0);
+    return max ? new Date(max) : null;
+  })();
+
+  const buildExportRows = () => {
+    const rows: (string | number)[][] = [];
+    let tV = 0, tS = 0, pmsV = 0, pmsS = 0, agoV = 0, agoS = 0;
+    (pumps ?? []).forEach((pump) => {
+      const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+      const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
+      const closingRaw = meters[pump.id] ?? ex?.closing_meter;
+      const closing = closingRaw ?? "";
+      const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
+      const price = prices[pump.id] ?? ex?.unit_price_usd ?? getPrevPrice(pump.id);
+      const aId = attendantSel[pump.id] ?? ex?.attendant_id ?? "";
+      const aName = (branchAttendants ?? []).find((a) => a.id === aId)?.full_name ?? "";
+      const volume = closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : 0;
+      const total = volume * Number(price);
+      if (volume > 0) {
+        tV += volume; tS += total;
+        if (pump.product_type === "PMS") { pmsV += volume; pmsS += total; }
+        else { agoV += volume; agoS += total; }
+      }
+      rows.push([
+        pump.name, pump.product_type, aName,
+        Number(opening), closing === "" ? "" : Number(closing),
+        Number(rtt), Number(price), volume, total.toFixed(2),
+      ]);
+    });
+    return { rows, tV, tS, pmsV, pmsS, agoV, agoS };
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!branchId || !selectedShift) throw new Error("Select branch and shift");
