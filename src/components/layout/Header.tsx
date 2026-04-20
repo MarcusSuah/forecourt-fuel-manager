@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useDismissedNotifications } from "@/hooks/useDismissedNotifications";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { useEffect, useRef } from "react";
+import { SyncStatusBadge } from "@/components/layout/SyncStatusBadge";
 
 interface HeaderProps {
   title: string;
@@ -268,6 +269,8 @@ export function Header({ title, subtitle }: HeaderProps) {
               </div>
             </PopoverContent>
           </Popover>
+
+          <SyncStatusBadge />
         </div>
       </div>
     </header>
