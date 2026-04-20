@@ -28,6 +28,7 @@ import Permissions from "./pages/Permissions";
 import TankDipping from "./pages/TankDipping";
 import MeterReading from "./pages/MeterReading";
 import ShiftStockReport from "./pages/ShiftStockReport";
+import Notifications from "./pages/Notifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/tank-dipping" element={<ProtectedRoute><TankDipping /></ProtectedRoute>} />
             <Route path="/meter-reading" element={<ProtectedRoute><MeterReading /></ProtectedRoute>} />
             <Route path="/shift-stock-report" element={<ProtectedRoute><ShiftStockReport /></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

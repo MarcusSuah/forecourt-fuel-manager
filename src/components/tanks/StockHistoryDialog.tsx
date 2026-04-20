@@ -8,8 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Droplets, Truck, Download, TrendingUp } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCSV } from "@/lib/csv-export";
 import {
@@ -109,7 +109,42 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
     return data.filter((ev) => ev.date >= dateFrom && ev.date <= dateTo);
   }, [data, dateFrom, dateTo]);
 
-  const filteredDesc = useMemo(() => [...filteredAsc].reverse(), [filteredAsc]);
+  // Compute dip-to-dip variance on the ascending list (vs previous dip), then reverse for display
+  const filteredWithVariance = useMemo(() => {
+    let prevDipLevel: number | null = null;
+    return filteredAsc.map((ev) => {
+      let dipVariance: number | null = null;
+      if (ev.type === "dip") {
+        if (prevDipLevel !== null) dipVariance = ev.qty - prevDipLevel;
+        prevDipLevel = ev.qty;
+      }
+      return { ...ev, dipVariance };
+    });
+  }, [filteredAsc]);
+
+  const filteredDesc = useMemo(() => [...filteredWithVariance].reverse(), [filteredWithVariance]);
+
+  // Summary stats for the selected period
+  const summary = useMemo(() => {
+    const dips = filteredAsc.filter((e) => e.type === "dip");
+    const dels = filteredAsc.filter((e) => e.type === "delivery");
+    const totalDeliveries = dels.reduce((s, d) => s + d.qty, 0);
+    const dipCount = dips.length;
+    const deliveryCount = dels.length;
+    const startLevel = filteredAsc[0]?.resultingLevel ?? 0;
+    const endLevel = filteredAsc[filteredAsc.length - 1]?.resultingLevel ?? 0;
+    const netChange = endLevel - startLevel;
+    return { totalDeliveries, dipCount, deliveryCount, netChange };
+  }, [filteredAsc]);
+
+  const setPreset = (preset: "7d" | "30d" | "month" | "year") => {
+    const now = new Date();
+    setDateTo(format(now, "yyyy-MM-dd"));
+    if (preset === "7d") setDateFrom(format(subDays(now, 7), "yyyy-MM-dd"));
+    else if (preset === "30d") setDateFrom(format(subDays(now, 30), "yyyy-MM-dd"));
+    else if (preset === "month") setDateFrom(format(startOfMonth(now), "yyyy-MM-dd"));
+    else if (preset === "year") setDateFrom(format(startOfYear(now), "yyyy-MM-dd"));
+  };
 
   const chartData = useMemo(
     () =>
@@ -124,12 +159,13 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
   const handleExport = () => {
     downloadCSV(
       `stock-history-${tankName}-${dateFrom}-to-${dateTo}.csv`,
-      ["Date", "Type", "Description", "Change (USG)", "Running Balance (USG)"],
+      ["Date", "Type", "Description", "Change (USG)", "Dip Variance (USG)", "Running Balance (USG)"],
       filteredDesc.map((ev) => [
         ev.date,
         ev.type === "dip" ? "Dip" : "Delivery",
         ev.label,
         ev.type === "delivery" ? `+${ev.qty}` : `=${ev.qty}`,
+        ev.dipVariance === null || ev.dipVariance === undefined ? "" : (ev.dipVariance >= 0 ? `+${ev.dipVariance}` : `${ev.dipVariance}`),
         ev.resultingLevel,
       ])
     );
@@ -143,20 +179,57 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
         </DialogHeader>
 
         {/* Filters + Export */}
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3 border-b border-border pb-3">
-          <div className="space-y-1">
-            <Label className="text-xs">From</Label>
-            <Input type="date" className="h-9 w-full sm:w-40" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        <div className="space-y-3 border-b border-border pb-3">
+          <div className="flex flex-wrap gap-1.5">
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPreset("7d")}>Last 7 days</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPreset("30d")}>Last 30 days</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPreset("month")}>This month</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setPreset("year")}>This year</Button>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">To</Label>
-            <Input type="date" className="h-9 w-full sm:w-40" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="h-9 w-full sm:w-40" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="h-9 w-full sm:w-40" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </div>
+            <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={!filteredDesc.length}>
+              <Download className="h-4 w-4 mr-1.5" /> Export CSV
+            </Button>
           </div>
-          <div className="flex-1" />
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!filteredDesc.length}>
-            <Download className="h-4 w-4 mr-1.5" /> Export CSV
-          </Button>
         </div>
+
+        {/* Summary strip */}
+        {filteredAsc.length > 0 && (
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <Truck className="h-3 w-3" /> Deliveries
+              </div>
+              <p className="text-base font-bold mt-0.5">+{summary.totalDeliveries.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">USG</span></p>
+              <p className="text-[10px] text-muted-foreground">{summary.deliveryCount} event{summary.deliveryCount !== 1 ? "s" : ""}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <Droplets className="h-3 w-3" /> Dips Recorded
+              </div>
+              <p className="text-base font-bold mt-0.5">{summary.dipCount}</p>
+              <p className="text-[10px] text-muted-foreground">readings in period</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {summary.netChange >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />} Net Change
+              </div>
+              <p className={cn("text-base font-bold mt-0.5", summary.netChange > 0 ? "text-success" : summary.netChange < 0 ? "text-destructive" : "text-foreground")}>
+                {summary.netChange >= 0 ? "+" : ""}{summary.netChange.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">USG</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground">start → end</p>
+            </div>
+          </div>
+        )}
 
         <div className="overflow-y-auto flex-1 space-y-4 pt-2">
           {isLoading ? (
@@ -205,6 +278,7 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
                     <TableHead>Type</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Change</TableHead>
+                    <TableHead className="text-right">Dip Variance</TableHead>
                     <TableHead className="text-right">Running Balance</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -228,6 +302,18 @@ export function StockHistoryDialog({ open, onOpenChange, tankId, tankName, capac
                         ev.type === "delivery" ? "text-success" : "text-muted-foreground"
                       )}>
                         {ev.type === "delivery" ? `+${ev.qty.toLocaleString()}` : `→ ${ev.qty.toLocaleString()}`}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {ev.type === "dip" && ev.dipVariance !== null && ev.dipVariance !== undefined ? (
+                          <span className={cn("inline-flex items-center gap-0.5 font-medium",
+                            Math.abs(ev.dipVariance) < 1 ? "text-muted-foreground" : ev.dipVariance > 0 ? "text-success" : "text-destructive"
+                          )}>
+                            {Math.abs(ev.dipVariance) < 1 ? <Minus className="h-3 w-3" /> : ev.dipVariance > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                            {ev.dipVariance >= 0 ? "+" : ""}{ev.dipVariance.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-bold">
                         {ev.resultingLevel.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">USG</span>
