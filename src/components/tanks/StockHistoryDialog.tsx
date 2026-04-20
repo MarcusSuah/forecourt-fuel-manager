@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,10 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus, ShieldAlert, AlertTriangle } from "lucide-react";
+import { Droplets, Truck, Download, TrendingUp, ArrowDown, ArrowUp, Minus, ShieldAlert, AlertTriangle, Save, Bell } from "lucide-react";
 import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { cn } from "@/lib/utils";
 import { downloadCSV } from "@/lib/csv-export";
+import { toast } from "sonner";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from "recharts";
