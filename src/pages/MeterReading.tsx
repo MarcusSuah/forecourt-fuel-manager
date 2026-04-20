@@ -248,6 +248,58 @@ export default function MeterReading() {
                 <Save className="h-4 w-4 mr-2" />
                 {saveMutation.isPending ? "Saving..." : "Save Readings"}
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const headers = [
+                    "Pump",
+                    "Product",
+                    "Attendant",
+                    "Opening Meter",
+                    "Closing Meter",
+                    "RTT (USG)",
+                    "Unit Price (USD)",
+                    "Volume (USG)",
+                    "Total (USD)",
+                  ];
+                  const rows: (string | number)[][] = [];
+                  let tV = 0, tS = 0, pmsV = 0, pmsS = 0, agoV = 0, agoS = 0;
+                  (pumps ?? []).forEach((pump) => {
+                    const ex = existingReadings?.find((r) => r.pump_id === pump.id);
+                    const opening = openings[pump.id] ?? ex?.opening_meter ?? getOpeningMeter(pump.id);
+                    const closingRaw = meters[pump.id] ?? ex?.closing_meter;
+                    const closing = closingRaw ?? "";
+                    const rtt = rtts[pump.id] ?? ex?.rtt_usg ?? 0;
+                    const price = prices[pump.id] ?? ex?.unit_price_usd ?? getPrevPrice(pump.id);
+                    const aId = attendantSel[pump.id] ?? ex?.attendant_id ?? "";
+                    const aName = (branchAttendants ?? []).find((a) => a.id === aId)?.full_name ?? "";
+                    const volume = closing !== "" ? Number(closing) - Number(opening) - Number(rtt) : 0;
+                    const total = volume * Number(price);
+                    if (volume > 0) {
+                      tV += volume; tS += total;
+                      if (pump.product_type === "PMS") { pmsV += volume; pmsS += total; }
+                      else { agoV += volume; agoS += total; }
+                    }
+                    rows.push([
+                      pump.name, pump.product_type, aName,
+                      Number(opening), closing === "" ? "" : Number(closing),
+                      Number(rtt), Number(price), volume, total.toFixed(2),
+                    ]);
+                  });
+                  rows.push(["PMS Subtotal", "", "", "", "", "", "", pmsV, pmsS.toFixed(2)]);
+                  rows.push(["AGO Subtotal", "", "", "", "", "", "", agoV, agoS.toFixed(2)]);
+                  rows.push(["Shift Total", "", "", "", "", "", "", tV, tS.toFixed(2)]);
+                  downloadCSV(
+                    `meter-readings-${selectedDate}-${selectedShift.slice(0, 8)}.csv`,
+                    headers,
+                    rows,
+                  );
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
