@@ -64,18 +64,6 @@ export default function MeterReading() {
     },
   });
 
-  const { data: companySettings } = useQuery({
-    queryKey: ["system-prefs-meter"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "system_preferences")
-        .maybeSingle();
-      if (error) throw error;
-      return data?.value as { company_name?: string } | null;
-    },
-  });
 
   const { data: shifts } = useQuery({
     queryKey: ["shifts"],
