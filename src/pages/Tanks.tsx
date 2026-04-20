@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Constants } from "@/integrations/supabase/types";
+import { StockHistoryDialog } from "@/components/tanks/StockHistoryDialog";
 
 export default function Tanks() {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ export default function Tanks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTank, setEditingTank] = useState<any>(null);
+  const [historyTank, setHistoryTank] = useState<any>(null);
 
   // Form state for create
   const [tankName, setTankName] = useState("");
@@ -62,6 +64,54 @@ export default function Tanks() {
       const { data, error } = await query;
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch latest dip per tank + deliveries since that dip
+  const tankIds = (tanks ?? []).map((t) => t.id);
+  const { data: breakdowns } = useQuery({
+    queryKey: ["tank-breakdowns", tankIds.join(",")],
+    enabled: tankIds.length > 0,
+    queryFn: async () => {
+      const [dipsRes, delsRes] = await Promise.all([
+        supabase
+          .from("stock_readings")
+          .select("tank_id, date, created_at, physical_level_usg")
+          .in("tank_id", tankIds)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("fuel_deliveries")
+          .select("tank_id, delivery_date, created_at, quantity_usg")
+          .in("tank_id", tankIds)
+          .order("delivery_date", { ascending: false })
+          .order("created_at", { ascending: false }),
+      ]);
+      if (dipsRes.error) throw dipsRes.error;
+      if (delsRes.error) throw delsRes.error;
+
+      const map: Record<string, { latestDipDate: string | null; opening: number; deliveriesSince: number; closing: number }> = {};
+      for (const tid of tankIds) {
+        const latestDip = (dipsRes.data ?? []).find((d) => d.tank_id === tid);
+        const opening = latestDip ? Number(latestDip.physical_level_usg) : 0;
+        const dipTs = latestDip ? `${latestDip.date}T${(latestDip.created_at as string).slice(11)}` : null;
+        const dipKey = latestDip ? `${latestDip.date} ${latestDip.created_at}` : "";
+        const deliveriesSince = (delsRes.data ?? [])
+          .filter((d) => d.tank_id === tid)
+          .filter((d) => {
+            if (!latestDip) return true;
+            const delKey = `${d.delivery_date} ${d.created_at}`;
+            return delKey > dipKey;
+          })
+          .reduce((s, d) => s + Number(d.quantity_usg), 0);
+        map[tid] = {
+          latestDipDate: latestDip?.date ?? null,
+          opening,
+          deliveriesSince,
+          closing: opening + deliveriesSince,
+        };
+      }
+      return map;
     },
   });
 
