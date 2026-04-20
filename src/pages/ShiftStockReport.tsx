@@ -128,40 +128,76 @@ export default function ShiftStockReport() {
     },
   });
 
+  // Fuel deliveries received during this shift's date (per tank) — added to Tank Sales reconciliation
+  const { data: deliveries } = useQuery({
+    queryKey: ["deliveries-report", branchId, selectedDate],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fuel_deliveries")
+        .select("tank_id, quantity_usg")
+        .eq("branch_id", branchId!)
+        .eq("delivery_date", selectedDate);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const reportData = useMemo(() => {
     if (!tanks) return [];
     return tanks.map((tank) => {
       const assignedPumps = tankPumpAssignments?.filter((a) => a.tank_id === tank.id).map((a) => a.pumps) ?? [];
-      const openingDip = prevReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? 0;
-      const closingDip = stockReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? 0;
-      const tankSales = Number(openingDip) - Number(closingDip);
+      // Opening dip: explicit current-shift opening if present (theoretical_level_usg),
+      // otherwise carry-over from previous shift's closing dip.
+      const currentReading = stockReadings?.find((r) => r.tank_id === tank.id);
+      const carryOver = prevReadings?.find((r) => r.tank_id === tank.id)?.physical_level_usg ?? 0;
+      const explicitOpening = currentReading?.theoretical_level_usg;
+      const openingDip = explicitOpening && Number(explicitOpening) > 0
+        ? Number(explicitOpening)
+        : Number(carryOver);
+      const closingDip = Number(currentReading?.physical_level_usg ?? 0);
+
+      // Deliveries into this tank on this date (reconciliation add-back)
+      const tankDeliveries = (deliveries ?? [])
+        .filter((d) => d.tank_id === tank.id)
+        .reduce((s, d) => s + Number(d.quantity_usg ?? 0), 0);
+
+      // Tank Sales (USG) = Opening Dip − Closing Dip + Deliveries
+      const tankSales = openingDip - closingDip + tankDeliveries;
 
       const pumpDetails = assignedPumps.map((pump: any) => {
         const sale = salesData?.find((s) => s.pump_id === pump?.id);
+        const openingMeter = Number(sale?.opening_meter ?? 0);
+        const closingMeter = Number(sale?.closing_meter ?? 0);
+        const rtt = Number(sale?.rtt_usg ?? 0);
+        // Meter Sales = Closing − Opening − RTT
+        const meterSales = closingMeter - openingMeter - rtt;
         return {
           name: pump?.name ?? "Unknown",
-          openingMeter: sale?.opening_meter ?? 0,
-          closingMeter: sale?.closing_meter ?? 0,
-          meterSales: (sale?.closing_meter ?? 0) - (sale?.opening_meter ?? 0),
+          openingMeter,
+          closingMeter,
+          meterSales,
         };
       });
 
       const totalMeterSales = pumpDetails.reduce((s, p) => s + p.meterSales, 0);
-      const variance = totalMeterSales - tankSales;
+      // Variance = Tank Sales (USG) − Meter Sales
+      const variance = tankSales - totalMeterSales;
 
       return {
         tankName: tank.name,
         productType: tank.product_type,
         capacity: Number(tank.capacity_usg),
-        openingDip: Number(openingDip),
-        closingDip: Number(closingDip),
+        openingDip,
+        closingDip,
+        deliveries: tankDeliveries,
         tankSales,
         pumps: pumpDetails,
         totalMeterSales,
         variance,
       };
     });
-  }, [tanks, tankPumpAssignments, stockReadings, salesData, prevReadings]);
+  }, [tanks, tankPumpAssignments, stockReadings, salesData, prevReadings, deliveries]);
 
   const shiftName = shifts?.find((s) => s.id === selectedShift)?.name ?? "";
   const branchName = isDealer ? dealerBranchName : branches?.find((b) => b.id === selectedBranch)?.name ?? "";

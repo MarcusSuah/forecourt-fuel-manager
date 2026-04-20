@@ -35,6 +35,7 @@ import Notifications from "./pages/Notifications";
 import ReconciliationAlerts from "./pages/ReconciliationAlerts";
 import AdminSyncQueue from "./pages/AdminSyncQueue";
 import AdminLoginActivities from "./pages/AdminLoginActivities";
+import Pumps from "./pages/Pumps";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -78,6 +79,7 @@ function AppShell() {
             <Route path="/reconciliation-alerts" element={<ProtectedRoute><ReconciliationAlerts /></ProtectedRoute>} />
             <Route path="/admin/sync-queue" element={<ProtectedRoute><AdminSyncQueue /></ProtectedRoute>} />
             <Route path="/admin/login-activities" element={<ProtectedRoute><AdminLoginActivities /></ProtectedRoute>} />
+            <Route path="/pumps" element={<ProtectedRoute><Pumps /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
