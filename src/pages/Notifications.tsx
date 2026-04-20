@@ -86,6 +86,21 @@ export default function Notifications() {
     },
   });
 
+  const { data: reconAlerts } = useQuery({
+    queryKey: ["notifs-recon-alerts", dealerBranchId],
+    queryFn: async () => {
+      let q = supabase
+        .from("reconciliation_alerts")
+        .select("id, tank_id, branch_id, loss_usg, threshold_usg, severity, created_at, tanks(name, product_type), branches(name)")
+        .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .order("created_at", { ascending: false });
+      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   // Realtime: refresh notifications when underlying tables change
   useEffect(() => {
     const channel = supabase
