@@ -140,7 +140,7 @@ export default function MeterReading() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("shift_sales_reports")
-        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id, unit_price_usd")
+        .select("pump_id, opening_meter, closing_meter, rtt_usg, attendant_id, unit_price_usd, updated_at")
         .eq("branch_id", branchId!)
         .eq("shift_id", selectedShift)
         .eq("date", selectedDate);
