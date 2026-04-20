@@ -422,6 +422,23 @@ export default function MeterReading() {
                 <Save className="h-4 w-4 mr-2" />
                 {saveMutation.isPending ? "Saving..." : "Save Readings"}
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const next: Record<string, number> = {};
+                  (pumps ?? []).forEach((p) => {
+                    next[p.id] = Number(getOpeningMeter(p.id));
+                  });
+                  setOpenings(next);
+                  toast.success("All opening meters reset to previous shift's closing values");
+                }}
+                disabled={!pumps || pumps.length === 0}
+                title="Reset all opening meters to the previous shift's closing values"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset openings
+              </Button>
               {lastSavedAt && (
                 <span className="text-xs text-muted-foreground">
                   Last saved {formatRelative(lastSavedAt)}

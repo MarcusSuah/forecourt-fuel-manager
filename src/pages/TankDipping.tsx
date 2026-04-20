@@ -18,6 +18,8 @@ import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Set
 import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
 import { Link } from "react-router-dom";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 
 // Tiny inline sparkline. Negative values are red, non-negative blue.
 function Sparkline({ values, width = 80, height = 24 }: { values: number[]; width?: number; height?: number }) {
@@ -56,6 +58,13 @@ export default function TankDipping() {
   const [resolveNotes, setResolveNotes] = useState<Record<string, string>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
+
+  // Unsaved-changes guard: any locally entered dip or opening that hasn't been persisted
+  const hasUnsavedChanges = Object.keys(dips).length > 0 || Object.keys(openings).length > 0;
+  const { dialogProps: unsavedDialogProps } = useUnsavedChangesGuard(
+    hasUnsavedChanges,
+    "You have unsaved tank dip readings. Leave this page and discard changes?",
+  );
 
   const { data: branches } = useQuery({
     queryKey: ["branches"],
@@ -644,6 +653,7 @@ export default function TankDipping() {
         </Card>
         </>
       )}
+      <UnsavedChangesDialog {...unsavedDialogProps} />
     </AppLayout>
   );
 }

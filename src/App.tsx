@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { useDocumentBranding } from "@/hooks/useDocumentBranding";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Tanks from "./pages/Tanks";
@@ -34,8 +35,9 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
+function AppShell() {
+  useDocumentBranding();
+  return (
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
@@ -75,6 +77,12 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
+  );
+}
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AppShell />
   </QueryClientProvider>
 );
 
