@@ -11,10 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle } from "lucide-react";
+import { Droplets, Save, TrendingDown, TrendingUp, RotateCcw, AlertTriangle, Settings2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { Link } from "react-router-dom";
 
 export default function TankDipping() {
   const { user } = useAuth();
@@ -25,6 +27,7 @@ export default function TankDipping() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [dips, setDips] = useState<Record<string, number>>({});
   const [openings, setOpenings] = useState<Record<string, number>>({});
+  const [thresholdDraft, setThresholdDraft] = useState<Record<string, string>>({});
 
   const branchId = isDealer ? dealerBranchId : selectedBranch;
 
@@ -232,6 +235,39 @@ export default function TankDipping() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  // Update reconciliation threshold for a tank
+  const thresholdMutation = useMutation({
+    mutationFn: async ({ tankId, value }: { tankId: string; value: number }) => {
+      const { error } = await supabase
+        .from("tanks")
+        .update({ reconciliation_threshold_usg: value })
+        .eq("id", tankId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Threshold updated");
+      queryClient.invalidateQueries({ queryKey: ["tanks-dipping"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Recent open (unresolved) reconciliation alerts for selected branch
+  const { data: recentAlerts } = useQuery({
+    queryKey: ["recent-open-alerts", branchId],
+    enabled: !!branchId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reconciliation_alerts")
+        .select("id, created_at, loss_usg, threshold_usg, severity, tank_id, tanks(name, product_type)")
+        .eq("branch_id", branchId!)
+        .is("resolved_at", null)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <AppLayout title="Daily Tank Dipping" subtitle="Record opening and closing dip readings per shift">
       <Card className="mb-6">
@@ -303,6 +339,42 @@ export default function TankDipping() {
               </CardContent>
             </Card>
           </div>
+          {recentAlerts && recentAlerts.length > 0 && (
+            <Card className="mb-4 border-destructive/30">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    Recent Open Alerts ({recentAlerts.length})
+                  </CardTitle>
+                  <Button asChild size="sm" variant="outline">
+                    <Link to="/reconciliation-alerts">
+                      View all <ExternalLink className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ul className="divide-y">
+                  {recentAlerts.map((a: any) => (
+                    <li key={a.id} className="py-2 flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge variant="outline" className={cn("text-[10px]", a.tanks?.product_type === "PMS" ? "border-fuel-pms text-fuel-pms" : "border-fuel-ago text-fuel-ago")}>
+                          {a.tanks?.product_type ?? "—"}
+                        </Badge>
+                        <span className="font-medium truncate">{a.tanks?.name ?? "Tank"}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(a.created_at), "MMM d, HH:mm")}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-destructive font-semibold">{Number(a.loss_usg).toLocaleString()} USG</span>
+                        <Badge variant={a.severity === "critical" ? "destructive" : "secondary"} className="text-[10px] capitalize">{a.severity}</Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
           <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -371,6 +443,53 @@ export default function TankDipping() {
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
                           </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                title={`Configure threshold (current: ±${threshold.toLocaleString()} USG)`}
+                              >
+                                <Settings2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64" align="end">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-sm font-medium">Reconciliation Threshold</p>
+                                  <p className="text-xs text-muted-foreground">{tank.name} • Variance over this triggers a critical alert.</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label htmlFor={`thr-${tank.id}`} className="text-xs">Threshold (USG)</Label>
+                                  <Input
+                                    id={`thr-${tank.id}`}
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    value={thresholdDraft[tank.id] ?? String(threshold)}
+                                    onChange={(e) => setThresholdDraft((p) => ({ ...p, [tank.id]: e.target.value }))}
+                                  />
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="w-full"
+                                  disabled={thresholdMutation.isPending}
+                                  onClick={() => {
+                                    const v = Number(thresholdDraft[tank.id] ?? threshold);
+                                    if (Number.isNaN(v) || v < 0) {
+                                      toast.error("Enter a valid non-negative number");
+                                      return;
+                                    }
+                                    thresholdMutation.mutate({ tankId: tank.id, value: v });
+                                  }}
+                                >
+                                  Save threshold
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </TableCell>
                       <TableCell>
