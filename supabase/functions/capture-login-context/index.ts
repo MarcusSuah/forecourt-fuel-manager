@@ -42,10 +42,6 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const {
       mode, // "success" | "failure"
-      user_id,
-      user_email,
-      user_full_name,
-      role,
       user_agent,
       device_fingerprint,
       attempted_email,
@@ -74,22 +70,50 @@ Deno.serve(async (req) => {
       });
     }
 
-    // success path — detect new device
+    // success path — REQUIRE valid JWT; derive identity server-side
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.toLowerCase().startsWith("bearer ")) {
+      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const verifiedUserId = userData.user.id;
+    const verifiedEmail = userData.user.email ?? null;
+
+    // Fetch role + full name server-side (do not trust client)
+    const [{ data: roleRow }, { data: profileRow }] = await Promise.all([
+      admin.from("user_roles").select("role").eq("user_id", verifiedUserId).maybeSingle(),
+      admin.from("profiles").select("full_name").eq("user_id", verifiedUserId).maybeSingle(),
+    ]);
+
     let isNewDevice = false;
-    if (user_id && device_fingerprint) {
+    if (device_fingerprint) {
       const { count } = await admin
         .from("login_activities")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user_id)
+        .eq("user_id", verifiedUserId)
         .eq("device_fingerprint", device_fingerprint);
       isNewDevice = (count ?? 0) === 0;
     }
 
     await admin.from("login_activities").insert({
-      user_id,
-      user_email: user_email ?? null,
-      user_full_name: user_full_name ?? null,
-      role: role ?? null,
+      user_id: verifiedUserId,
+      user_email: verifiedEmail,
+      user_full_name: profileRow?.full_name ?? null,
+      role: roleRow?.role ?? null,
       user_agent: user_agent ?? null,
       ip_address: geo.ip,
       country: geo.country,
