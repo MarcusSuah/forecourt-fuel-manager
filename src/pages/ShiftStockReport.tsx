@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { downloadCSV } from "@/lib/csv-export";
 import { exportTableToPDF } from "@/lib/pdf-export";
 import { buildPDFHeaderInfo } from "@/lib/pdf-header-info";
+import { DailyTankDippingCard } from "@/components/dashboard/DailyTankDippingCard";
 
 export default function ShiftStockReport() {
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
