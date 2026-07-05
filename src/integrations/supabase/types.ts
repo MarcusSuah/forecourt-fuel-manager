@@ -1428,6 +1428,10 @@ export type Database = {
         Returns: undefined
       }
       bootstrap_admin: { Args: { _user_id: string }; Returns: boolean }
+      can_view_branch: {
+        Args: { _branch_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_user_branch: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
