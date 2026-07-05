@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
+import { useAuth } from "@/contexts/AuthContext";
+import SupervisorDashboard from "./SupervisorDashboard";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TankCard } from "@/components/dashboard/TankCard";
@@ -17,6 +19,9 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  if (user?.role === "supervisor") return <SupervisorDashboard />;
+
   const today = format(new Date(), "yyyy-MM-dd");
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
 

@@ -47,6 +47,21 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings, permission: null },
 ];
 
+// Which routes each non-admin role may see. Admin sees everything.
+const DEALER_ALLOWED = new Set<string>([
+  "/dashboard","/tanks","/tank-dipping","/pumps","/meter-reading","/shift-stock-report",
+  "/sales","/cash","/stock","/deliveries","/employees","/hrm","/payroll",
+  "/profit-loss","/financial-situation","/reports","/attendants",
+  "/notifications","/chat","/settings",
+]);
+
+const SUPERVISOR_ALLOWED = new Set<string>([
+  "/dashboard","/branches","/tanks","/pumps","/shift-stock-report",
+  "/cash","/deliveries","/employees","/payroll",
+  "/profit-loss","/financial-situation","/reports","/analytics",
+  "/notifications","/chat","/settings",
+]);
+
 interface SidebarProps {
   onNavigate?: () => void;
 }
@@ -84,10 +99,13 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   // Filter navigation based on permissions
   const visibleNav = navigation.filter(item => {
-    // Items with no permission are always visible
-    if (!item.permission) return true;
     // Admin sees everything
     if (user?.role === "admin") return true;
+    // Role-based route allow-list
+    if (user?.role === "dealer" && !DEALER_ALLOWED.has(item.href)) return false;
+    if (user?.role === "supervisor" && !SUPERVISOR_ALLOWED.has(item.href)) return false;
+    // Items with no permission are visible (subject to role allow-list above)
+    if (!item.permission) return true;
     // Check permission
     return hasPermission(item.permission);
   });

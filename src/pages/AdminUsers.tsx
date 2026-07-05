@@ -17,9 +17,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Shield, Edit2, Trash2, Users, Save } from "lucide-react";
+import { Shield, Edit2, Trash2, Users, Save, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Constants } from "@/integrations/supabase/types";
+import { ZONE_OPTIONS } from "@/hooks/useSupervisorZone";
 
 const roleColors: Record<string, string> = {
   admin: "bg-destructive/15 text-destructive border-destructive/30",
@@ -44,6 +45,7 @@ export default function AdminUsers() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState("");
   const [editBranch, setEditBranch] = useState("");
+  const [editZone, setEditZone] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Auto-assign admin role if current user has no role (uses bootstrap_admin which only works when no admins exist)
@@ -94,7 +96,7 @@ export default function AdminUsers() {
   const { data: attendantsData } = useQuery({
     queryKey: ["all-attendants-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("attendants").select("user_id, branch_id, branches(name)");
+      const { data, error } = await supabase.from("attendants").select("user_id, branch_id, supervisor_zone, branches(name)");
       if (error) throw error;
       return data;
     },
@@ -128,18 +130,18 @@ export default function AdminUsers() {
   });
 
   const updateBranchMutation = useMutation({
-    mutationFn: async ({ userId, branchId, fullName }: { userId: string; branchId: string; fullName: string }) => {
+    mutationFn: async ({ userId, branchId, zone, fullName }: { userId: string; branchId: string | null; zone: string | null; fullName: string }) => {
       const existing = attendantsData?.find(a => a.user_id === userId);
       if (existing) {
-        const { error } = await supabase.from("attendants").update({ branch_id: branchId }).eq("user_id", userId);
+        const { error } = await supabase.from("attendants").update({ branch_id: branchId as any, supervisor_zone: zone as any }).eq("user_id", userId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("attendants").insert({ user_id: userId, branch_id: branchId, full_name: fullName });
+        const { error } = await supabase.from("attendants").insert({ user_id: userId, branch_id: branchId as any, supervisor_zone: zone as any, full_name: fullName });
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      toast.success("Branch assignment updated");
+      toast.success("Assignment updated");
       queryClient.invalidateQueries({ queryKey: ["all-attendants-admin"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -169,6 +171,7 @@ export default function AdminUsers() {
     setEditRole(getRoleForUser(userId) || "");
     const branchInfo = getBranchForUser(userId);
     setEditBranch(branchInfo?.branch_id || "");
+    setEditZone((branchInfo as any)?.supervisor_zone || "");
     setDialogOpen(true);
   };
 
@@ -176,8 +179,32 @@ export default function AdminUsers() {
     if (!editingUserId) return;
     const profile = profiles?.find(p => p.user_id === editingUserId);
     if (editRole) updateRoleMutation.mutate({ userId: editingUserId, role: editRole });
-    if (editBranch && profile) updateBranchMutation.mutate({ userId: editingUserId, branchId: editBranch, fullName: profile.full_name });
+    if (profile && (editBranch || editZone)) {
+      updateBranchMutation.mutate({
+        userId: editingUserId,
+        branchId: editBranch || null,
+        zone: editZone || null,
+        fullName: profile.full_name,
+      });
+    }
     setDialogOpen(false);
+  };
+
+  const [seeding, setSeeding] = useState(false);
+  const runSeed = async (fn: "seed-branch-dealers" | "seed-zone-supervisors") => {
+    setSeeding(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(fn);
+      if (error) throw error;
+      toast.success((data as any)?.message || "Seed complete");
+      queryClient.invalidateQueries({ queryKey: ["all-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["all-user-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["all-attendants-admin"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Seed failed");
+    } finally {
+      setSeeding(false);
+    }
   };
 
   if (!isAdmin) {
@@ -196,6 +223,30 @@ export default function AdminUsers() {
 
   return (
     <AppLayout title="User Management" subtitle="Manage roles and branch assignments">
+      {/* Seed default accounts */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> Default accounts
+          </CardTitle>
+          <CardDescription>
+            Auto-create a dealer per branch and a supervisor per zone. Defaults: dealer password
+            <code className="mx-1 px-1 rounded bg-muted text-xs">dealer@123</code>
+            supervisor password
+            <code className="mx-1 px-1 rounded bg-muted text-xs">suprse@231</code>.
+            Users change these under Settings after first login.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-3 flex-wrap">
+          <Button variant="outline" onClick={() => runSeed("seed-branch-dealers")} disabled={seeding}>
+            Seed missing dealers
+          </Button>
+          <Button variant="outline" onClick={() => runSeed("seed-zone-supervisors")} disabled={seeding}>
+            Seed missing supervisors
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Role Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {Constants.public.Enums.app_role.map((role) => {
@@ -326,7 +377,22 @@ export default function AdminUsers() {
                   {branches?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">Used for dealers, cashiers, and attendants.</p>
             </div>
+            {editRole === "supervisor" && (
+              <div className="space-y-2">
+                <Label>Supervisor Zone</Label>
+                <Select value={editZone} onValueChange={setEditZone}>
+                  <SelectTrigger><SelectValue placeholder="Select zone" /></SelectTrigger>
+                  <SelectContent>
+                    {ZONE_OPTIONS.map((z) => (
+                      <SelectItem key={z} value={z} className="capitalize">{z}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Supervisor sees every station in this zone.</p>
+              </div>
+            )}
             <Button onClick={saveEdit} className="w-full">
               <Save className="h-4 w-4 mr-2" /> Save Changes
             </Button>

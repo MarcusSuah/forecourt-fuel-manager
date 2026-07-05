@@ -57,14 +57,14 @@ function AppShell() {
             
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/tanks" element={<ProtectedRoute><Tanks /></ProtectedRoute>} />
-            <Route path="/branches" element={<ProtectedRoute><Branches /></ProtectedRoute>} />
+            <Route path="/branches" element={<ProtectedRoute deniedRoles={["dealer"]}><Branches /></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute><SalesEntry /></ProtectedRoute>} />
             <Route path="/cash" element={<ProtectedRoute><CashReports /></ProtectedRoute>} />
             <Route path="/stock" element={<ProtectedRoute><StockControl /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/attendants" element={<ProtectedRoute><Attendants /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute deniedRoles={["dealer"]}><Analytics /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminUsers /></ProtectedRoute>} />
             <Route path="/deliveries" element={<ProtectedRoute><Deliveries /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
@@ -73,14 +73,14 @@ function AppShell() {
             <Route path="/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
             <Route path="/financial-situation" element={<ProtectedRoute><FinancialSituation /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-            <Route path="/permissions" element={<ProtectedRoute><Permissions /></ProtectedRoute>} />
+            <Route path="/permissions" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><Permissions /></ProtectedRoute>} />
             <Route path="/tank-dipping" element={<ProtectedRoute><TankDipping /></ProtectedRoute>} />
             <Route path="/meter-reading" element={<ProtectedRoute><MeterReading /></ProtectedRoute>} />
             <Route path="/shift-stock-report" element={<ProtectedRoute><ShiftStockReport /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-            <Route path="/reconciliation-alerts" element={<ProtectedRoute><ReconciliationAlerts /></ProtectedRoute>} />
-            <Route path="/admin/sync-queue" element={<ProtectedRoute><AdminSyncQueue /></ProtectedRoute>} />
-            <Route path="/admin/login-activities" element={<ProtectedRoute><AdminLoginActivities /></ProtectedRoute>} />
+            <Route path="/reconciliation-alerts" element={<ProtectedRoute deniedRoles={["dealer","cashier","attendant"]}><ReconciliationAlerts /></ProtectedRoute>} />
+            <Route path="/admin/sync-queue" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminSyncQueue /></ProtectedRoute>} />
+            <Route path="/admin/login-activities" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminLoginActivities /></ProtectedRoute>} />
             <Route path="/pumps" element={<ProtectedRoute><Pumps /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
