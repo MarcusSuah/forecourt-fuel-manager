@@ -289,6 +289,15 @@ export default function ShiftStockReport() {
         </CardContent>
       </Card>
 
+      {branchId && (
+        <DailyTankDippingCard
+          branchId={branchId}
+          branchName={branchName}
+          endDate={selectedDate}
+          days={7}
+        />
+      )}
+
       {branchId && selectedShift && (
         <>
           <div className="text-center mb-4 print:mb-2">
