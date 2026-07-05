@@ -9,7 +9,7 @@ import {
   DollarSign, PieChart, Landmark, MessageCircle, Lock, Gauge,
   ClipboardList, Bell,
   ShieldAlert, CloudOff,
-  Activity,
+  Activity, UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +45,7 @@ const navigation = [
   { name: "Notifications", href: "/notifications", icon: Bell, permission: null },
   { name: "Chat", href: "/chat", icon: MessageCircle, permission: null },
   { name: "Settings", href: "/settings", icon: Settings, permission: null },
+  { name: "My Profile", href: "/profile", icon: UserCircle, permission: null },
 ];
 
 // Which routes each non-admin role may see. Admin sees everything.
@@ -52,14 +53,14 @@ const DEALER_ALLOWED = new Set<string>([
   "/dashboard","/tanks","/tank-dipping","/pumps","/meter-reading","/shift-stock-report",
   "/sales","/cash","/stock","/deliveries","/employees","/hrm","/payroll",
   "/profit-loss","/financial-situation","/reports","/attendants",
-  "/notifications","/chat","/settings",
+  "/notifications","/chat","/settings","/profile",
 ]);
 
 const SUPERVISOR_ALLOWED = new Set<string>([
   "/dashboard","/branches","/tanks","/pumps","/shift-stock-report",
   "/cash","/deliveries","/employees","/payroll",
   "/profit-loss","/financial-situation","/reports","/analytics",
-  "/notifications","/chat","/settings",
+  "/notifications","/chat","/settings","/profile",
 ]);
 
 interface SidebarProps {
