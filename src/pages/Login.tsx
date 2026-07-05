@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Fuel, Mail, Lock, Eye, EyeOff, User, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +80,15 @@ export default function Login() {
   };
 
   return (
+    <>
+    <Helmet>
+      <title>Sign in — Forecourt MS</title>
+      <meta name="description" content="Sign in to Forecourt MS to manage tanks, pumps, shifts, deliveries, and cash reports across your petrol stations in Liberia." />
+      <link rel="canonical" href="https://forecourt-ms.lovable.app/login" />
+      <meta property="og:title" content="Sign in — Forecourt MS" />
+      <meta property="og:description" content="Sign in to Forecourt MS to manage tanks, pumps, shifts, deliveries, and cash reports across your petrol stations in Liberia." />
+      <meta property="og:url" content="https://forecourt-ms.lovable.app/login" />
+    </Helmet>
     <main className="min-h-screen flex flex-col lg:flex-row">
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-sidebar relative overflow-hidden">
@@ -226,5 +236,6 @@ export default function Login() {
         </div>
       </div>
     </main>
+    </>
   );
 }
