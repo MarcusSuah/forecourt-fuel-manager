@@ -56,9 +56,9 @@ export default function SupervisorDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reconciliation_alerts")
-        .select("id, branch_id, status")
+        .select("id, branch_id, resolved_at")
         .in("branch_id", activeBranchIds)
-        .eq("status", "pending");
+        .is("resolved_at", null);
       if (error) return [];
       return data ?? [];
     },
