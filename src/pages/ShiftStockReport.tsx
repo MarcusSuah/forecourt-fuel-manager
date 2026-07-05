@@ -295,8 +295,107 @@ export default function ShiftStockReport() {
           branchName={branchName}
           endDate={selectedDate}
           days={7}
+          shiftId={selectedShift || undefined}
+          shiftName={shiftName || undefined}
         />
       )}
+
+      {branchId && selectedShift && reportData.length > 0 && (() => {
+        const OUTLIER_PCT = 0.02;
+        const OUTLIER_FLOOR = 25;
+        type Issue = { tank: string; product: string; kind: string; detail: string; severity: "high" | "medium" };
+        const issues: Issue[] = [];
+        reportData.forEach((t) => {
+          const bound = Math.max(OUTLIER_FLOOR, Math.abs(t.tankSales) * OUTLIER_PCT);
+          if (Math.abs(t.variance) > bound) {
+            issues.push({
+              tank: t.tankName, product: t.productType,
+              kind: "Variance exceeds 2% threshold",
+              detail: `Tank sales ${t.tankSales.toLocaleString()} USG vs meter sales ${t.totalMeterSales.toLocaleString()} USG (Δ ${t.variance >= 0 ? "+" : ""}${t.variance.toLocaleString()})`,
+              severity: Math.abs(t.variance) > bound * 2 ? "high" : "medium",
+            });
+          }
+          if (t.pumps.length === 0) {
+            issues.push({
+              tank: t.tankName, product: t.productType,
+              kind: "No pumps assigned",
+              detail: "Tank has no pump-tank mapping — meter reconciliation cannot be computed.",
+              severity: "medium",
+            });
+          }
+          if (t.openingDip === 0 && t.closingDip === 0) {
+            issues.push({
+              tank: t.tankName, product: t.productType,
+              kind: "Missing tank dipping",
+              detail: "No opening or closing dip recorded for this shift.",
+              severity: "high",
+            });
+          }
+          if (t.deliveries > 0 && t.closingDip <= t.openingDip - t.deliveries) {
+            issues.push({
+              tank: t.tankName, product: t.productType,
+              kind: "Delivery not reflected in closing dip",
+              detail: `Received +${t.deliveries.toLocaleString()} USG but closing dip did not rise accordingly.`,
+              severity: "medium",
+            });
+          }
+        });
+        return (
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className={issues.length ? "text-destructive" : "text-success"}>
+                  {issues.length ? "⚠" : "✓"}
+                </span>
+                Shift Reconciliation — {shiftName} · {format(new Date(selectedDate), "MMM dd, yyyy")}
+                <Badge variant={issues.length ? "destructive" : "outline"} className="ml-2">
+                  {issues.length} {issues.length === 1 ? "issue" : "issues"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {issues.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  All tank dippings, deliveries and pump meter readings reconcile within the 2% threshold. No action required.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tank</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Issue</TableHead>
+                      <TableHead>Detail</TableHead>
+                      <TableHead>Severity</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {issues.map((i, idx) => (
+                      <TableRow key={idx} className={i.severity === "high" ? "bg-destructive/5" : "bg-warning/5"}>
+                        <TableCell className="font-medium">{i.tank}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn(
+                            i.product === "PMS"
+                              ? "border-fuel-pms text-fuel-pms bg-fuel-pms/10"
+                              : "border-fuel-ago text-fuel-ago bg-fuel-ago/10"
+                          )}>{i.product}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{i.kind}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{i.detail}</TableCell>
+                        <TableCell>
+                          <Badge variant={i.severity === "high" ? "destructive" : "secondary"}>
+                            {i.severity.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {branchId && selectedShift && (
         <>
