@@ -79,7 +79,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
+    <main className="min-h-screen flex flex-col lg:flex-row">
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-sidebar relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
@@ -87,26 +87,26 @@ export default function Login() {
           <div className="absolute bottom-32 right-20 w-96 h-96 rounded-full bg-sidebar-primary blur-3xl" />
         </div>
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
             {logoUrl ? (
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary/10 overflow-hidden">
                 <img src={logoUrl} alt={`${companyName} logo`} className="h-full w-full object-contain" />
               </div>
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sidebar-primary">
-                <Fuel className="h-6 w-6 text-sidebar-primary-foreground" />
+                <Fuel className="h-6 w-6 text-sidebar-primary-foreground" aria-hidden="true" />
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-sidebar-foreground">{companyName}</h1>
+              <p className="text-2xl font-bold text-sidebar-foreground">{companyName}</p>
               <p className="text-sm text-sidebar-foreground/60">Forecourt Management</p>
             </div>
           </div>
           <div className="space-y-6">
-            <h2 className="text-4xl font-bold text-sidebar-foreground leading-tight">
+            <p className="text-4xl font-bold text-sidebar-foreground leading-tight">
               Manage Your Petrol Stations with{" "}
               <span className="text-sidebar-primary">Precision</span>
-            </h2>
+            </p>
             <p className="text-lg text-sidebar-foreground/70 max-w-md">
               Complete forecourt management solution for multi-branch operations across Liberia.
             </p>
@@ -130,19 +130,19 @@ export default function Login() {
               </div>
             ) : (
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-                <Fuel className="h-6 w-6 text-primary-foreground" />
+                <Fuel className="h-6 w-6 text-primary-foreground" aria-hidden="true" />
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-foreground">{companyName}</h1>
+              <p className="text-2xl font-bold text-foreground">{companyName}</p>
               <p className="text-sm text-muted-foreground">Forecourt Management</p>
             </div>
           </div>
 
           <div className="text-center lg:text-left">
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground">
-              {isSignUp ? "Create an account" : "Welcome back"}
-            </h2>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+              {isSignUp ? `Create your ${companyName} account` : `Sign in to ${companyName}`}
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {isSignUp ? "Sign up to get started with FMS" : "Sign in to your account to continue"}
             </p>
@@ -193,8 +193,8 @@ export default function Login() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10" required minLength={6} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
                 </button>
               </div>
             </div>
@@ -225,6 +225,6 @@ export default function Login() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
