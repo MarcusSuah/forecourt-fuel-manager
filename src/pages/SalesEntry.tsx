@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Save, Receipt, Calculator, Download, User } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
+import { usgToLiters } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
