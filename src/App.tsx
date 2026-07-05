@@ -37,6 +37,7 @@ import ReconciliationAlerts from "./pages/ReconciliationAlerts";
 import AdminSyncQueue from "./pages/AdminSyncQueue";
 import AdminLoginActivities from "./pages/AdminLoginActivities";
 import Pumps from "./pages/Pumps";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,7 @@ function AppShell() {
             <Route path="/admin/sync-queue" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminSyncQueue /></ProtectedRoute>} />
             <Route path="/admin/login-activities" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminLoginActivities /></ProtectedRoute>} />
             <Route path="/pumps" element={<ProtectedRoute><Pumps /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
