@@ -80,6 +80,9 @@ Deno.serve(async (req) => {
         is_active: true,
       }, { onConflict: "user_id" });
 
+      // Force credential change on first login
+      await admin.from("profiles").update({ must_change_credentials: true }).eq("user_id", userId);
+
       created += 1;
       results.push({ branch: b.name, email, status: "created" });
     }

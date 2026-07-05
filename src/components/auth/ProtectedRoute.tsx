@@ -27,6 +27,11 @@ export function ProtectedRoute({ children, allowedRoles, deniedRoles }: Protecte
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Force seeded users to update their default email/password on first login.
+  if (user.profile?.must_change_credentials && location.pathname !== "/profile") {
+    return <Navigate to="/profile" replace state={{ forced: true }} />;
+  }
+
   if (allowedRoles && user.role && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
   }

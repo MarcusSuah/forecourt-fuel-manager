@@ -13,6 +13,7 @@ interface AuthUser extends User {
     email: string | null;
     phone: string | null;
     avatar_url: string | null;
+    must_change_credentials?: boolean;
   };
 }
 
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const [{ data: roleData }, { data: profileData }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-        supabase.from("profiles").select("full_name, email, phone, avatar_url").eq("user_id", userId).maybeSingle(),
+        supabase.from("profiles").select("full_name, email, phone, avatar_url, must_change_credentials").eq("user_id", userId).maybeSingle(),
       ]);
       return {
         role: roleData?.role || undefined,
