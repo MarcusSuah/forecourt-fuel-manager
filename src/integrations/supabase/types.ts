@@ -65,7 +65,7 @@ export type Database = {
       }
       attendants: {
         Row: {
-          branch_id: string
+          branch_id: string | null
           created_at: string
           employee_id: string | null
           full_name: string
@@ -77,7 +77,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          branch_id: string
+          branch_id?: string | null
           created_at?: string
           employee_id?: string | null
           full_name: string
@@ -89,7 +89,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          branch_id?: string
+          branch_id?: string | null
           created_at?: string
           employee_id?: string | null
           full_name?: string
