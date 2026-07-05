@@ -70,6 +70,8 @@ Deno.serve(async (req) => {
         is_active: true,
       }, { onConflict: "user_id" });
 
+      await admin.from("profiles").update({ must_change_credentials: true }).eq("user_id", userId);
+
       created += 1;
       results.push({ zone, email, status: "created" });
     }
