@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Building2, Plus, Edit2, Power, MapPin } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Constants } from "@/integrations/supabase/types";
+import { ZONE_OPTIONS } from "@/hooks/useSupervisorZone";
 
 export default function Branches() {
   const queryClient = useQueryClient();
@@ -33,6 +34,7 @@ export default function Branches() {
   const [formLocation, setFormLocation] = useState("");
   const [formFranchise, setFormFranchise] = useState<string>("");
   const [formActive, setFormActive] = useState(true);
+  const [formZone, setFormZone] = useState<string>("central");
 
   const { data: branches, isLoading } = useQuery({
     queryKey: ["branches-mgmt"],
@@ -54,6 +56,7 @@ export default function Branches() {
           location: branch.location || null,
           franchise_type: branch.franchise_type,
           is_active: branch.is_active,
+          zone: branch.zone as any,
         }).eq("id", branch.id);
         if (error) throw error;
       } else {
@@ -63,6 +66,7 @@ export default function Branches() {
           location: branch.location || null,
           franchise_type: branch.franchise_type,
           is_active: branch.is_active,
+          zone: branch.zone as any,
         });
         if (error) throw error;
       }
@@ -96,6 +100,7 @@ export default function Branches() {
     setFormLocation("");
     setFormFranchise("");
     setFormActive(true);
+    setFormZone("central");
     setEditing(null);
   };
 
@@ -111,6 +116,7 @@ export default function Branches() {
     setFormLocation(branch.location || "");
     setFormFranchise(branch.franchise_type);
     setFormActive(branch.is_active);
+    setFormZone(branch.zone || "central");
     setDialogOpen(true);
   };
 
@@ -126,6 +132,7 @@ export default function Branches() {
       location: formLocation,
       franchise_type: formFranchise,
       is_active: formActive,
+      zone: formZone,
     });
   };
 
@@ -177,6 +184,7 @@ export default function Branches() {
                 <TableHead>Name</TableHead>
                 <TableHead>County</TableHead>
                 <TableHead>Location</TableHead>
+                <TableHead>Zone</TableHead>
                 <TableHead>Franchise Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-28">Actions</TableHead>
@@ -184,15 +192,16 @@ export default function Branches() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading...</TableCell></TableRow>
               ) : filtered?.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No branches found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No branches found</TableCell></TableRow>
               ) : (
                 filtered?.map(b => (
                   <TableRow key={b.id}>
                     <TableCell className="font-medium">{b.name}</TableCell>
                     <TableCell>{b.county}</TableCell>
                     <TableCell className="text-muted-foreground">{b.location || "—"}</TableCell>
+                    <TableCell><Badge variant="outline" className="capitalize">{(b as any).zone || "—"}</Badge></TableCell>
                     <TableCell>
                       <Badge variant="outline" className={franchiseColors[b.franchise_type] || ""}>
                         {b.franchise_type}
@@ -255,6 +264,17 @@ export default function Branches() {
                 <SelectContent>
                   {Constants.public.Enums.franchise_type.map(ft => (
                     <SelectItem key={ft} value={ft}>{ft}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Zone *</Label>
+              <Select value={formZone} onValueChange={setFormZone}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ZONE_OPTIONS.map(z => (
+                    <SelectItem key={z} value={z} className="capitalize">{z}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
