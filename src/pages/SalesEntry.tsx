@@ -215,7 +215,7 @@ export default function SalesEntry() {
     const rtt = parseFloat(entry.rtt_usg) || 0;
     const price = parseFloat(entry.unit_price_usd) || 0;
     const salesUsg = close - open - rtt;
-    const salesLiters = salesUsg * 3.78541;
+    const salesLiters = usgToLiters(salesUsg);
     const totalUsd = salesUsg * price;
     return { salesUsg, salesLiters, totalUsd };
   };

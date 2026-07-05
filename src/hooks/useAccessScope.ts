@@ -18,7 +18,7 @@ export function useAccessScope() {
   const { user } = useAuth();
   const role = user?.role as AppRole | undefined;
 
-  const { branchId: dealerBranchId } = useDealerBranch();
+  const { dealerBranchId } = useDealerBranch();
   const { zone, zoneBranchIds } = useSupervisorZone();
 
   return useMemo(() => {
