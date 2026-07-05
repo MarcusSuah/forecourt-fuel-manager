@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import FuelInventoryGuide from "./pages/FuelInventoryGuide";
 import { useDocumentBranding } from "@/hooks/useDocumentBranding";
 import { useEffect } from "react";
 import { installSyncListeners } from "@/lib/sync-queue";
@@ -52,6 +53,7 @@ function AppShell() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/features/fuel-inventory-management" element={<FuelInventoryGuide />} />
             
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/tanks" element={<ProtectedRoute><Tanks /></ProtectedRoute>} />
