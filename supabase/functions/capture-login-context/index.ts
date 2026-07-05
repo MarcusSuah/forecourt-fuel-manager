@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
     // success path — REQUIRE valid JWT; derive identity server-side
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.toLowerCase().startsWith("bearer ")) {
-      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
-        status: 401,
+      return new Response(JSON.stringify({ ok: false, error: "missing_auth", skipped: true }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -85,8 +85,8 @@ Deno.serve(async (req) => {
     );
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
-        status: 401,
+      return new Response(JSON.stringify({ ok: false, error: "invalid_session", skipped: true }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
