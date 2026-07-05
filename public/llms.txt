@@ -1,0 +1,10 @@
+# Forecourt MS
+
+> Forecourt Management System — a multi-branch web application for managing petrol station operations across Liberia (tanks, pumps, shifts, deliveries, HR, and financials).
+
+Forecourt MS is a private, authenticated operations platform for petroleum retailers. Most functionality lives behind sign-in; the public surface is limited to the marketing landing page and the login screen.
+
+## Pages
+
+- [Home](/): Product overview and entry point to sign in.
+- [Sign in](/login): Authentication for admins, supervisors, dealers, cashiers, and attendants.
