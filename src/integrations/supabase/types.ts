@@ -1460,6 +1460,7 @@ export type Database = {
         Args: { _branch_id: string; _user_id: string }
         Returns: boolean
       }
+      must_change_credentials: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "supervisor" | "cashier" | "attendant" | "dealer"

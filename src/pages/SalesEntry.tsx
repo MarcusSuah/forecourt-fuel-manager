@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Save, Receipt, Calculator, Download, User } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
+import { usgToLiters } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -215,7 +216,7 @@ export default function SalesEntry() {
     const rtt = parseFloat(entry.rtt_usg) || 0;
     const price = parseFloat(entry.unit_price_usd) || 0;
     const salesUsg = close - open - rtt;
-    const salesLiters = salesUsg * 3.78541;
+    const salesLiters = usgToLiters(salesUsg);
     const totalUsd = salesUsg * price;
     return { salesUsg, salesLiters, totalUsd };
   };
