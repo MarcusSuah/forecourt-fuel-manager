@@ -72,6 +72,7 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string | null
+          supervisor_zone: Database["public"]["Enums"]["zone_type"] | null
           updated_at: string
           user_id: string | null
         }
@@ -83,6 +84,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
+          supervisor_zone?: Database["public"]["Enums"]["zone_type"] | null
           updated_at?: string
           user_id?: string | null
         }
@@ -94,6 +96,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
+          supervisor_zone?: Database["public"]["Enums"]["zone_type"] | null
           updated_at?: string
           user_id?: string | null
         }
@@ -155,6 +158,7 @@ export type Database = {
           location: string | null
           name: string
           updated_at: string
+          zone: Database["public"]["Enums"]["zone_type"] | null
         }
         Insert: {
           county: string
@@ -165,6 +169,7 @@ export type Database = {
           location?: string | null
           name: string
           updated_at?: string
+          zone?: Database["public"]["Enums"]["zone_type"] | null
         }
         Update: {
           county?: string
@@ -175,6 +180,7 @@ export type Database = {
           location?: string | null
           name?: string
           updated_at?: string
+          zone?: Database["public"]["Enums"]["zone_type"] | null
         }
         Relationships: []
       }
@@ -1427,6 +1433,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_user_zone: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["zone_type"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1439,6 +1449,10 @@ export type Database = {
         Args: { _branch_id: string; _user_id: string }
         Returns: boolean
       }
+      is_supervisor_for_branch: {
+        Args: { _branch_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "supervisor" | "cashier" | "attendant" | "dealer"
@@ -1446,6 +1460,7 @@ export type Database = {
       product_type: "PMS" | "AGO"
       shift_name: "Morning" | "Afternoon" | "Night" | "All Day"
       tank_status: "Full" | "Medium" | "Low" | "Critical"
+      zone_type: "central" | "north" | "east" | "west" | "south"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1578,6 +1593,7 @@ export const Constants = {
       product_type: ["PMS", "AGO"],
       shift_name: ["Morning", "Afternoon", "Night", "All Day"],
       tank_status: ["Full", "Medium", "Low", "Critical"],
+      zone_type: ["central", "north", "east", "west", "south"],
     },
   },
 } as const
