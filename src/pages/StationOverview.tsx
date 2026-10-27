@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TankCard } from "@/components/dashboard/TankCard";
 import { CashSummary } from "@/components/dashboard/CashSummary";
 import { SalesChart } from "@/components/dashboard/SalesChart";
-import { BranchPerformance } from "@/components/dashboard/BranchPerformance";
+import { NetworkPerformanceCard, StationSalesStockCard } from "@/components/dashboard/RoleCards";
 import { Fuel, DollarSign, Users, AlertTriangle, Bell } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -229,7 +229,7 @@ export default function StationOverview() {
         </div>
       </div>
 
-      {!isDealer && <BranchPerformance />}
+      {isDealer ? <StationSalesStockCard branchId={dealerBranchId} /> : <NetworkPerformanceCard />}
     </AppLayout>
   );
 }
