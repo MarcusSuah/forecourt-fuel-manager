@@ -732,13 +732,16 @@ export type Database = {
           bonuses: number
           created_at: string
           created_by: string | null
+          days_worked: number
           deductions: number
+          details: Json
           employee_id: string
           gross_salary: number
           id: string
           month: number
           net_salary: number
           notes: string | null
+          other_deductions: number
           status: string
           updated_at: string
           year: number
@@ -747,13 +750,16 @@ export type Database = {
           bonuses?: number
           created_at?: string
           created_by?: string | null
+          days_worked?: number
           deductions?: number
+          details?: Json
           employee_id: string
           gross_salary?: number
           id?: string
           month: number
           net_salary?: number
           notes?: string | null
+          other_deductions?: number
           status?: string
           updated_at?: string
           year: number
@@ -762,13 +768,16 @@ export type Database = {
           bonuses?: number
           created_at?: string
           created_by?: string | null
+          days_worked?: number
           deductions?: number
+          details?: Json
           employee_id?: string
           gross_salary?: number
           id?: string
           month?: number
           net_salary?: number
           notes?: string | null
+          other_deductions?: number
           status?: string
           updated_at?: string
           year?: number
