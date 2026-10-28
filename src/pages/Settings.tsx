@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { invalidatePDFHeaderCache } from "@/lib/pdf-header-info";
+import { PayrollTemplateSettings } from "@/components/settings/PayrollTemplateSettings";
 
 interface SettingRow {
   id: string;
@@ -188,6 +189,8 @@ export default function Settings() {
   return (
     <AppLayout title="Settings" subtitle="Configure exchange rates, thresholds, and system preferences">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PayrollTemplateSettings />
+
         {/* Exchange Rate */}
         <Card>
           <CardHeader>
