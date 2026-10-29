@@ -15,9 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { toast } from "sonner";
 import { FileText, Play, Printer, Download } from "lucide-react";
 import { downloadCSV } from "@/lib/csv-export";
+import { PayrollHistory } from "@/components/payroll/PayrollHistory";
+import { PayrollAssistant } from "@/components/payroll/PayrollAssistant";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const f2 = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export interface PrintCtx { name?: string | null; location?: string | null; period: string; fx: number; date?: string }
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
 const COLS: [string, keyof PayrollLine][] = [
@@ -120,12 +123,13 @@ export default function Payroll() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const header = (t: PayrollTemplate) => `
-    <table class="hd"><tr><td><b>STATION NAME:</b></td><td>${esc(branch?.name)}</td></tr>
-    <tr><td><b>LOCATION:</b></td><td>${esc(branch?.location)}</td></tr>
-    <tr><td><b>PAYROLL PERIOD:</b></td><td>${esc(periodLabel)}</td></tr>
-    <tr><td><b>PAYROLL DATE:</b></td><td>${new Date().toLocaleDateString()}</td></tr>
-    <tr><td><b>Exchange Rate:</b></td><td>${t.exchange_rate} LRD / USD</td></tr>
+  const curCtx = (): PrintCtx => ({ name: branch?.name, location: branch?.location, period: periodLabel, fx: tpl?.exchange_rate ?? 0 });
+  const header = (t: PayrollTemplate, c: PrintCtx = curCtx()) => `
+    <table class="hd"><tr><td><b>STATION NAME:</b></td><td>${esc(c.name)}</td></tr>
+    <tr><td><b>LOCATION:</b></td><td>${esc(c.location)}</td></tr>
+    <tr><td><b>PAYROLL PERIOD:</b></td><td>${esc(c.period)}</td></tr>
+    <tr><td><b>PAYROLL DATE:</b></td><td>${c.date ?? new Date().toLocaleDateString()}</td></tr>
+    <tr><td><b>Exchange Rate:</b></td><td>${c.fx} LRD / USD</td></tr>
     <tr><td><b>Employee Social Security rate:</b></td><td>${(t.employee_ss_rate * 100).toFixed(2)}%</td></tr>
     <tr><td><b>Employer Social Security rate:</b></td><td>${(t.employer_ss_rate * 100).toFixed(2)}%</td></tr></table>`;
   const sign = (t: PayrollTemplate) => `<div class="sig">
@@ -144,19 +148,22 @@ export default function Payroll() {
     w.document.close();
   };
 
-  const printSheet = () => {
-    if (!tpl || !rows.length) return toast.error("No payroll data");
+  const printSheet = (list: { emp: any; line: PayrollLine }[] = rows, c: PrintCtx = curCtx()) => {
+    if (!tpl || !list.length) return toast.error("No payroll data");
+    const tot: Partial<Record<keyof PayrollLine, number>> = {};
+    list.forEach(({ line }) => COLS.forEach(([, k]) => { tot[k] = (tot[k] ?? 0) + (Number(line[k]) || 0); }));
+    const payable = (tot.incomeTaxUSDPr ?? 0) + (tot.nasEmployee ?? 0) + (tot.nasEmployer ?? 0) + (tot.roundedNetUSD ?? 0);
     const head = `<tr><th>#</th><th>SEX</th><th>FULL NAME</th><th>JOB POSITION</th>${COLS.map(([l]) => `<th>${l}</th>`).join("")}<th>Signature</th></tr>`;
-    const body = rows.map(({ emp, line }, i) => `<tr><td>${i + 1}</td><td class="l">${esc(emp.gender?.[0] ?? "")}</td><td class="l">${esc(emp.full_name)}</td><td class="l">${esc(emp.position)}</td>${COLS.map(([, k]) => `<td>${k === "daysWorked" ? line[k] : f2(line[k])}</td>`).join("")}<td></td></tr>`).join("");
-    const foot = `<tr><td colspan="4"><b>Total:</b></td>${COLS.map(([, k]) => `<td><b>${k === "daysWorked" ? "" : f2(totals[k] ?? 0)}</b></td>`).join("")}<td></td></tr>`;
-    openPrint(`Payroll ${periodLabel}`, `${header(tpl)}<br/><table class="grid">${head}${body}${foot}</table>
-      <p style="text-align:right"><b>Total salaries & wages payable: $${f2(totalPayable)}</b></p>${sign(tpl)}`);
+    const body = list.map(({ emp, line }, i) => `<tr><td>${i + 1}</td><td class="l">${esc(emp.gender?.[0] ?? "")}</td><td class="l">${esc(emp.full_name)}</td><td class="l">${esc(emp.position)}</td>${COLS.map(([, k]) => `<td>${k === "daysWorked" ? line[k] : f2(Number(line[k]) || 0)}</td>`).join("")}<td></td></tr>`).join("");
+    const foot = `<tr><td colspan="4"><b>Total:</b></td>${COLS.map(([, k]) => `<td><b>${k === "daysWorked" ? "" : f2(tot[k] ?? 0)}</b></td>`).join("")}<td></td></tr>`;
+    openPrint(`Payroll ${c.period}`, `${header(tpl, c)}<br/><table class="grid">${head}${body}${foot}</table>
+      <p style="text-align:right"><b>Total salaries & wages payable: $${f2(payable)}</b></p>${sign(tpl)}`);
   };
 
-  const printSlip = (emp: any, line: PayrollLine) => {
+  const printSlip = (emp: any, line: PayrollLine, c: PrintCtx = curCtx()) => {
     if (!tpl) return;
     const r = (l: string, v: string) => `<tr><td class="l">${l}</td><td>${v}</td></tr>`;
-    openPrint(`Payslip - ${emp.full_name}`, `<h2 style="text-align:center">PAYSLIP</h2>${header(tpl)}<br/>
+    openPrint(`Payslip - ${emp.full_name}`, `<h2 style="text-align:center">PAYSLIP</h2>${header(tpl, c)}<br/>
       <table class="grid" style="width:100%">
       ${r("Employee", esc(emp.full_name))}${r("Job position", esc(emp.position))}${r("Sex", esc(emp.gender ?? ""))}
       ${r("Gross salary (USD)", f2(line.gross))}${r("Days worked", String(line.daysWorked))}${r("Gross prorated (USD)", f2(line.grossPr))}
@@ -213,7 +220,7 @@ export default function Payroll() {
                 <Play className="h-4 w-4 mr-1" /> Generate Payroll
               </Button>
               <Button variant="outline" onClick={exportCSV}><Download className="h-4 w-4 mr-1" /> CSV</Button>
-              <Button variant="outline" onClick={printSheet}><Printer className="h-4 w-4 mr-1" /> Print sheet / PDF</Button>
+              <Button variant="outline" onClick={() => printSheet()}><Printer className="h-4 w-4 mr-1" /> Print sheet / PDF</Button>
             </div>
           </CardContent>
         </Card>
@@ -274,6 +281,12 @@ export default function Payroll() {
             )}
           </CardContent>
         </Card>
+
+        <PayrollHistory branches={visibleBranches} lockBranch={isDealer ? branchId : undefined}
+          onPrintSheet={printSheet} onPrintSlip={printSlip} />
+        {(isDealer || user?.role === "admin") && branchId && (
+          <PayrollAssistant branchId={branchId} branchName={branch?.name} month={+month} year={+year} />
+        )}
       </div>
     </AppLayout>
   );
