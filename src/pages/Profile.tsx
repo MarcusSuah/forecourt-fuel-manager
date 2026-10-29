@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Save, ShieldAlert, UserCog, KeyRound } from "lucide-react";
+import { validateEmail } from "@/lib/email-validation";
 
 export default function Profile() {
   const { user, session } = useAuth();
@@ -41,12 +42,14 @@ export default function Profile() {
   const isSeededEmail = (e: string) => /@forecourtms\.local$/i.test(e);
   const emailChanged = email.trim().toLowerCase() !== (user?.email || "").toLowerCase();
   const passwordProvided = password.length > 0;
+  const emailError = emailChanged && email.trim() ? validateEmail(email) : null;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
       if (!fullName.trim()) throw new Error("Full name is required");
       if (!email.trim()) throw new Error("Email is required");
+      if (emailError) throw new Error(emailError);
 
       if (forced) {
         if (isSeededEmail(email)) throw new Error("Please replace the default email with your real address");
@@ -125,13 +128,15 @@ export default function Profile() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email {forced && <span className="text-destructive">*</span>}</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-              {forced && isSeededEmail(email) && (
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@gmail.com"
+                aria-invalid={!!emailError} className={emailError ? "border-destructive" : ""} />
+              {forced && isSeededEmail(email) ? (
                 <p className="text-xs text-destructive">Replace the default email with your real address.</p>
-              )}
-              {emailChanged && !forced && (
+              ) : emailError ? (
+                <p className="text-xs text-destructive">{emailError}</p>
+              ) : emailChanged && !forced ? (
                 <p className="text-xs text-muted-foreground">A confirmation email may be sent to verify this change.</p>
-              )}
+              ) : null}
             </div>
           </CardContent>
         </Card>
