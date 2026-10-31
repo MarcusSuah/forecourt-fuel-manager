@@ -15,4 +15,13 @@ describe("payroll template", () => {
     expect(l.grossPr).toBe(77.5);
     expect(l.roundedNetUSD).toBe(Math.round(l.netPr) - 5);
   });
+  it("full breakdown subtracts lateness, advances and shortages", () => {
+    const b = computePayrollBreakdown({ salary: 155, daysWorked: 15.5, lateCount: 3, advances: 10, shortages: 4 }, T);
+    expect(b.earnings.proratedGross).toBe(77.5);
+    expect(b.otherDeductions.latenessPenalty).toBe(3);
+    expect(b.otherDeductions.total).toBe(17);
+    const base = computePayrollLine(155, 15.5, 0, T);
+    expect(b.totals.netPayUSD).toBe(base.roundedNetUSD - 17);
+    expect(b.totals.netPayLRD).toBe((base.roundedNetUSD - 17) * 174);
+  });
 });

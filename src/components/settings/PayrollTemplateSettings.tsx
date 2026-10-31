@@ -44,6 +44,7 @@ export function PayrollTemplateSettings() {
           <div className="space-y-1"><Label>Employee social security %</Label>{num("employee_ss_rate", true)}</div>
           <div className="space-y-1"><Label>Employer social security %</Label>{num("employer_ss_rate", true)}</div>
           <div className="space-y-1"><Label>Days in month (proration)</Label>{num("days_in_month")}</div>
+          <div className="space-y-1"><Label>Lateness penalty per late (USD)</Label>{num("lateness_penalty_usd")}</div>
         </div>
         <div>
           <Label>Annual income tax brackets (LRD) — tax = (income − from) × rate + base</Label>
