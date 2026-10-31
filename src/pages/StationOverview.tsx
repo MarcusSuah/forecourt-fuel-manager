@@ -17,7 +17,7 @@ import { format } from "date-fns";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-export default function StationOverview() {
+export default function StationOverview({ extra }: { extra?: React.ReactNode } = {}) {
   const { user } = useAuth();
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -230,6 +230,7 @@ export default function StationOverview() {
       </div>
 
       {isDealer ? <StationSalesStockCard branchId={dealerBranchId} /> : <NetworkPerformanceCard />}
+      {extra}
     </AppLayout>
   );
 }
