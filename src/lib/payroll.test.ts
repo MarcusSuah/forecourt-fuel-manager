@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computePayrollLine, DEFAULT_PAYROLL_TEMPLATE as T } from "./payroll";
+import { computePayrollLine, computePayrollBreakdown, DEFAULT_PAYROLL_TEMPLATE as T } from "./payroll";
 
 describe("payroll template", () => {
   it("matches spreadsheet row for $150, 31 days", () => {
