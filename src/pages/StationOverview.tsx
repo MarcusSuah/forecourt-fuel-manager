@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDealerBranch } from "@/hooks/useDealerBranch";
@@ -17,7 +18,7 @@ import { format } from "date-fns";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-export default function StationOverview() {
+export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
   const { user } = useAuth();
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -230,6 +231,7 @@ export default function StationOverview() {
       </div>
 
       {isDealer ? <StationSalesStockCard branchId={dealerBranchId} /> : <NetworkPerformanceCard />}
+      {extra}
     </AppLayout>
   );
 }

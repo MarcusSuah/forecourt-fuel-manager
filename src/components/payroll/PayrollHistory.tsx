@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { PayrollLine } from "@/lib/payroll";
@@ -26,9 +27,11 @@ interface Props {
 }
 
 export function PayrollHistory({ branches, lockBranch, onPrintSheet, onPrintSlip }: Props) {
-  const [station, setStation] = useState("all");
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [month, setMonth] = useState("all");
+  const [params] = useSearchParams();
+  const [station, setStation] = useState(params.get("station") ?? "all");
+  const [year, setYear] = useState(params.get("year") ?? String(new Date().getFullYear()));
+  const [month, setMonth] = useState(params.get("month") ?? "all");
+  const wantRun = params.get("station") && params.get("month") ? `${params.get("station")}-${params.get("year")}-${params.get("month")}` : null;
   const [open, setOpen] = useState<Run | null>(null);
   const effStation = lockBranch ?? station;
   const ids = branches.map((b) => b.id);
@@ -74,8 +77,15 @@ export function PayrollHistory({ branches, lockBranch, onPrintSheet, onPrintSlip
     return [...map.values()].sort((a, b) => b.year - a.year || b.month - a.month || (a.branch?.name ?? "").localeCompare(b.branch?.name ?? ""));
   }, [data, branches]);
 
+  const [autoOpened, setAutoOpened] = useState(false);
+  useEffect(() => {
+    if (!wantRun || autoOpened) return;
+    const r = runs.find((x) => x.key === wantRun);
+    if (r) { setOpen(r); setAutoOpened(true); document.getElementById("payroll-history")?.scrollIntoView({ behavior: "smooth" }); }
+  }, [runs, wantRun, autoOpened]);
+
   return (
-    <Card>
+    <Card id="payroll-history">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Payroll History</CardTitle>
         <CardDescription>Saved payroll runs. Reopen a run to view payslips, or print the full sheet as it was saved.</CardDescription>

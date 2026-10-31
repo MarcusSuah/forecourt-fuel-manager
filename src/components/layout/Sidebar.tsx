@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: null },
+  { name: "Station Dashboard", href: "/station-dashboard", icon: LayoutDashboard, permission: null },
   { name: "Branches", href: "/branches", icon: Building2, permission: "branches.view" },
   { name: "Tank Management", href: "/tanks", icon: Droplets, permission: "tanks.view" },
   { name: "Tank Dipping", href: "/tank-dipping", icon: Droplets, permission: "tanks.view" },
@@ -50,14 +51,14 @@ const navigation = [
 
 // Which routes each non-admin role may see. Admin sees everything.
 const DEALER_ALLOWED = new Set<string>([
-  "/dashboard","/tanks","/tank-dipping","/pumps","/meter-reading","/shift-stock-report",
+  "/dashboard","/station-dashboard","/tanks","/tank-dipping","/pumps","/meter-reading","/shift-stock-report",
   "/sales","/cash","/stock","/deliveries","/employees","/hrm","/payroll",
   "/profit-loss","/financial-situation","/reports","/attendants",
   "/notifications","/chat","/settings","/profile",
 ]);
 
 const SUPERVISOR_ALLOWED = new Set<string>([
-  "/dashboard","/branches","/tanks","/pumps","/shift-stock-report",
+  "/dashboard","/station-dashboard","/branches","/tanks","/pumps","/shift-stock-report",
   "/cash","/deliveries","/employees","/payroll",
   "/profit-loss","/financial-situation","/reports","/analytics",
   "/notifications","/chat","/settings","/profile",
