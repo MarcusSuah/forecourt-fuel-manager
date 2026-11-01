@@ -105,11 +105,11 @@ export default function StationDashboard() {
         </div>
 
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-          <MetricCard title="Sales" value={usd(sales.usd)} icon={DollarSign} />
-          <MetricCard title="PMS sold (USG)" value={n2(sales.PMS)} icon={Fuel} />
-          <MetricCard title="AGO sold (USG)" value={n2(sales.AGO)} icon={Fuel} />
-          <MetricCard title="Stock on hand (USG)" value={n2(totalStock)} subtitle={totalCap ? `${Math.round((totalStock / totalCap) * 100)}% of capacity` : undefined} icon={Droplets} />
-          <MetricCard title="Latest net payroll" value={payroll ? usd(payroll.net) : "—"} subtitle={payroll ? `${MONTHS[payroll.month - 1]} ${payroll.year}` : "No runs yet"} icon={Wallet} />
+          <MetricCard title="Sales" value={usd(sales.usd)} icon={<DollarSign className="h-5 w-5" />} />
+          <MetricCard title="PMS sold (USG)" value={n2(sales.PMS)} icon={<Fuel className="h-5 w-5" />} />
+          <MetricCard title="AGO sold (USG)" value={n2(sales.AGO)} icon={<Fuel className="h-5 w-5" />} />
+          <MetricCard title="Stock on hand (USG)" value={n2(totalStock)} subtitle={totalCap ? `${Math.round((totalStock / totalCap) * 100)}% of capacity` : undefined} icon={<Droplets className="h-5 w-5" />} />
+          <MetricCard title="Latest net payroll" value={payroll ? usd(payroll.net) : "—"} subtitle={payroll ? `${MONTHS[payroll.month - 1]} ${payroll.year}` : "No runs yet"} icon={<Wallet className="h-5 w-5" />} />
         </div>
 
         <Card>
