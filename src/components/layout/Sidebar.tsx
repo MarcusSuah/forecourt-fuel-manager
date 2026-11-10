@@ -38,7 +38,8 @@ const navigation = [
   { name: "Financial", href: "/financial-situation", icon: Landmark, permission: "financials.view" },
   { name: "Reports", href: "/reports", icon: FileBarChart, permission: "reports.view" },
   { name: "Attendants", href: "/attendants", icon: Users, permission: "attendants.view" },
-  { name: "Analytics", href: "/analytics", icon: TrendingUp, permission: "analytics.view" },
+  { name: "Analytics", href: "/analytics", icon: TrendingUp, permission: null },
+  { name: "Admin Analytics", href: "/admin-analytics", icon: TrendingUp, permission: null },
   { name: "Permissions", href: "/permissions", icon: Lock, permission: "permissions.manage" },
   { name: "Admin", href: "/admin", icon: ShieldCheck, permission: "admin.manage" },
   { name: "Reconciliation Alerts", href: "/reconciliation-alerts", icon: ShieldAlert, permission: "admin.manage" },
@@ -54,7 +55,7 @@ const navigation = [
 const DEALER_ALLOWED = new Set<string>([
   "/dashboard","/station-dashboard","/station-analytics","/tanks","/tank-dipping","/pumps","/meter-reading","/shift-stock-report",
   "/sales","/cash","/stock","/deliveries","/employees","/hrm","/payroll",
-  "/profit-loss","/financial-situation","/reports","/attendants",
+  "/profit-loss","/financial-situation","/reports","/analytics","/attendants",
   "/notifications","/chat","/settings","/profile",
 ]);
 

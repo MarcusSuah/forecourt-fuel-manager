@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { fetchAll } from "@/lib/fetch-all";
 import { allBuckets, bucketKey, bucketLabel, rangeFor, tankDaySales, type Granularity } from "@/lib/analytics-buckets";
 
 const C = {
@@ -31,17 +32,6 @@ const n0 = (n: number) => Math.round(n).toLocaleString();
 const usd = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const NONE = ["00000000-0000-0000-0000-000000000000"];
 
-/** Page through results to avoid the 1000-row cap on long ranges. */
-async function fetchAll<T>(build: (from: number, to: number) => any): Promise<T[]> {
-  const out: T[] = [];
-  for (let i = 0; ; i += 1000) {
-    const { data, error } = await build(i, i + 999);
-    if (error) throw error;
-    out.push(...(data ?? []));
-    if (!data || data.length < 1000) break;
-  }
-  return out;
-}
 
 function ChartCard({ title, desc, children, className }: { title: string; desc?: string; children: React.ReactNode; className?: string }) {
   return (
@@ -92,7 +82,7 @@ export default function StationAnalytics() {
         fetchAll<any>((a, b) => supabase.from("stock_readings").select("tank_id, date, physical_level_usg, theoretical_level_usg, created_at, shifts(name)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).order("created_at").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("fuel_deliveries").select("tank_id, delivery_date, quantity_usg, supplier").eq("branch_id", branchId).gte("delivery_date", fromIso).lte("delivery_date", toIso).range(a, b)),
         fetchAll<any>((a, b) => supabase.from("shift_sales_reports").select("date, pump_id, attendant_id, opening_meter, closing_meter, sales_usg, total_sales_usd, shifts(name), attendants(full_name), pumps(name, product_type)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("cash_deposits").select("date, amount, amount_usd, deposit_type, attendant_id, shifts(name), attendants(full_name)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("cash_deposits").select("date, amount, amount_usd, exchange_rate, deposit_type, attendant_id, shifts(name), attendants(full_name)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).range(a, b)),
       ]);
       return { tanks, pumps, dips, deliveries, sales, cash };
     },
@@ -165,7 +155,7 @@ export default function StationAnalytics() {
     const cashAtt: Record<string, number> = {};
     data.cash.forEach((c: any) => {
       const k = bucketKey(g, c.date); if (!(k in cashB)) return;
-      const v = c.amount_usd != null ? Number(c.amount_usd) : c.deposit_type === "USD" ? Number(c.amount) : 0;
+      const v = c.amount_usd != null ? Number(c.amount_usd) : c.deposit_type === "USD" ? Number(c.amount) || 0 : (Number(c.amount) || 0) / (Number(c.exchange_rate) || 1);
       cashB[k] += v;
       const sh = c.shifts?.name ?? "—"; cashShift[sh] = (cashShift[sh] ?? 0) + v;
       if (c.attendant_id) cashAtt[c.attendant_id] = (cashAtt[c.attendant_id] ?? 0) + v;

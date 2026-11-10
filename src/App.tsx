@@ -20,6 +20,7 @@ import AdminUsers from "./pages/AdminUsers";
 import Attendants from "./pages/Attendants";
 import Branches from "./pages/Branches";
 import Analytics from "./pages/Analytics";
+import AdminAnalytics from "./pages/AdminAnalytics";
 import Settings from "./pages/Settings";
 import Deliveries from "./pages/Deliveries";
 import Employees from "./pages/Employees";
@@ -66,7 +67,8 @@ function AppShell() {
             <Route path="/stock" element={<ProtectedRoute><StockControl /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/attendants" element={<ProtectedRoute><Attendants /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute deniedRoles={["dealer"]}><Analytics /></ProtectedRoute>} />
+            <Route path="/analytics" element={<ProtectedRoute deniedRoles={["cashier","attendant"]}><Analytics /></ProtectedRoute>} />
+            <Route path="/admin-analytics" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAnalytics /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminUsers /></ProtectedRoute>} />
             <Route path="/deliveries" element={<ProtectedRoute><Deliveries /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
