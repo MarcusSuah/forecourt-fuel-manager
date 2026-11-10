@@ -84,7 +84,7 @@ export default function AdminAnalytics() {
 
   return (
     <AppLayout title="Admin Analytics" subtitle="All stations by day, week, month and year">
-      <div className="space-y-6">
+      <div className="page-stagger space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <p className="text-sm text-muted-foreground">{format(from, "MMM d, yyyy")} – {format(to, "MMM d, yyyy")}</p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
