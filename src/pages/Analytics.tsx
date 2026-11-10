@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranchFilter } from "@/hooks/useDealerBranch";
+import { useAccessScope } from "@/hooks/useAccessScope";
+import { BarChart, Bar, Legend } from "recharts";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -38,14 +40,17 @@ const PIE_COLORS = [
 export default function Analytics() {
   const [period, setPeriod] = useState("7");
   const { branchFilter, setBranchFilter, isBranchDisabled, isDealer } = useBranchFilter();
+  const scope = useAccessScope();
   const dateFrom = format(subDays(new Date(), parseInt(period)), "yyyy-MM-dd");
   const dateTo = format(new Date(), "yyyy-MM-dd");
   const prevFrom = format(subDays(new Date(), parseInt(period) * 2), "yyyy-MM-dd");
 
   const { data: branches } = useQuery({
-    queryKey: ["branches"],
+    queryKey: ["analytics-branches", scope.allowedBranchIds?.join(",") ?? "all"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true);
+      let bq = supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      if (scope.allowedBranchIds) bq = bq.in("id", scope.allowedBranchIds.length ? scope.allowedBranchIds : ["00000000-0000-0000-0000-000000000000"]);
+      const { data, error } = await bq;
       if (error) throw error;
       return data;
     },
@@ -142,6 +147,17 @@ export default function Analytics() {
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [salesData]);
 
+  const byBranch = useMemo(() => {
+    const map = new Map<string, { name: string; sales: number; cash: number; volume: number }>();
+    const get = (id: string, name?: string) => {
+      if (!map.has(id)) map.set(id, { name: name || "Unknown", sales: 0, cash: 0, volume: 0 });
+      return map.get(id)!;
+    };
+    salesData?.forEach((r: any) => { const b = get(r.branch_id, r.branches?.name); b.sales += Number(r.total_sales_usd) || 0; b.volume += Number(r.sales_usg) || 0; });
+    cashData?.forEach((r: any) => { get(r.branch_id, r.branches?.name).cash += Number(r.amount_usd) || 0; });
+    return Array.from(map.values()).sort((a, b) => b.sales - a.sales);
+  }, [salesData, cashData]);
+
   const topAttendants = useMemo(() => {
     if (!salesData) return [];
     const map = new Map<string, { name: string; revenue: number; transactions: number }>();
@@ -227,6 +243,29 @@ export default function Analytics() {
           </CardContent>
         </Card>
       </div>
+
+      {!isDealer && branchFilter === "all" && (
+        <Card className="mb-6 animate-fade-in">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Figures by branch</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            {byBranch.length === 0 ? <p className="text-muted-foreground text-sm py-8 text-center">No data</p> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byBranch}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={60} />
+                  <YAxis tick={{ fontSize: 11 }} width={55} />
+                  <ChartTooltip formatter={(v: number) => `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="sales" name="Sales ($)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} animationDuration={900} />
+                  <Bar dataKey="cash" name="Cash deposited ($)" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} animationDuration={900} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card className="lg:col-span-2">
