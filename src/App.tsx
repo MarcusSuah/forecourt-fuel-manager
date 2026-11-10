@@ -37,6 +37,7 @@ import ReconciliationAlerts from "./pages/ReconciliationAlerts";
 import AdminSyncQueue from "./pages/AdminSyncQueue";
 import AdminLoginActivities from "./pages/AdminLoginActivities";
 import StationDashboard from "./pages/StationDashboard";
+import StationAnalytics from "./pages/StationAnalytics";
 import Pumps from "./pages/Pumps";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -84,6 +85,7 @@ function AppShell() {
             <Route path="/admin/sync-queue" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminSyncQueue /></ProtectedRoute>} />
             <Route path="/admin/login-activities" element={<ProtectedRoute deniedRoles={["dealer","supervisor","cashier","attendant"]}><AdminLoginActivities /></ProtectedRoute>} />
             <Route path="/station-dashboard" element={<ProtectedRoute deniedRoles={["cashier","attendant"]}><StationDashboard /></ProtectedRoute>} />
+            <Route path="/station-analytics" element={<ProtectedRoute deniedRoles={["cashier","attendant"]}><StationAnalytics /></ProtectedRoute>} />
             <Route path="/pumps" element={<ProtectedRoute><Pumps /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             
