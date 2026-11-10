@@ -6,5 +6,5 @@
 - [x] Admin dashboard station picker
 - [x] Admin Payroll overview page
 - [x] Dashboard animations
-- [ ] Verify cash deposits show on Station Analytics (April 2026 deposit check)
+- [x] Verify cash deposits show on Station Analytics (April 2026 deposits show in Year/Month view)
 - [ ] Replace placeholder stations with real stations, pumps, tanks, employees — blocked: needs the user's real data
