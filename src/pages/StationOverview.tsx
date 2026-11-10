@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
@@ -23,18 +24,31 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
 
   const today = format(new Date(), "yyyy-MM-dd");
   const { isDealer, dealerBranchId, dealerBranchName } = useDealerBranch();
+  const [picked, setPicked] = useState("all");
+  const isAdmin = user?.role === "admin";
+  const { data: stationList } = useQuery({
+    queryKey: ["overview-stations"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("branches").select("id, name").eq("is_active", true).order("name");
+      if (error) throw error; return data;
+    },
+  });
+  // Branch the dashboard is scoped to: dealer's own, or admin's picked station, or null for all.
+  const effBranch: string | null = isDealer ? dealerBranchId ?? null : picked !== "all" ? picked : null;
+  const pickedName = stationList?.find((b) => b.id === picked)?.name;
 
   // Helper to apply branch filter
   const branchFilter = (q: any) => {
-    if (isDealer && dealerBranchId) return q.eq("branch_id", dealerBranchId);
+    if (effBranch) return q.eq("branch_id", effBranch);
     return q;
   };
 
   const { data: tanks, isLoading: tanksLoading } = useQuery({
-    queryKey: ["dashboard-tanks", dealerBranchId],
+    queryKey: ["dashboard-tanks", effBranch],
     queryFn: async () => {
       let q = supabase.from("tanks").select("*, branches(name)").eq("is_active", true).order("current_level_usg", { ascending: true }).limit(6);
-      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      if (effBranch) q = q.eq("branch_id", effBranch);
       const { data, error } = await q;
       if (error) throw error;
       return data;
@@ -42,10 +56,10 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
   });
 
   const { data: allTanks } = useQuery({
-    queryKey: ["all-tanks-summary", dealerBranchId],
+    queryKey: ["all-tanks-summary", effBranch],
     queryFn: async () => {
       let q = supabase.from("tanks").select("id, name, product_type, current_level_usg, capacity_usg, status, branch_id, branches(name)").eq("is_active", true);
-      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      if (effBranch) q = q.eq("branch_id", effBranch);
       const { data, error } = await q;
       if (error) throw error;
       return data;
@@ -62,10 +76,10 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
   });
 
   const { data: todaySales } = useQuery({
-    queryKey: ["dashboard-today-sales", today, dealerBranchId],
+    queryKey: ["dashboard-today-sales", today, effBranch],
     queryFn: async () => {
       let q = supabase.from("shift_sales_reports").select("total_sales_usd, sales_usg, pumps(product_type)").eq("date", today);
-      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      if (effBranch) q = q.eq("branch_id", effBranch);
       const { data, error } = await q;
       if (error) throw error;
       return data;
@@ -73,10 +87,10 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
   });
 
   const { data: todayCash } = useQuery({
-    queryKey: ["dashboard-today-cash", today, dealerBranchId],
+    queryKey: ["dashboard-today-cash", today, effBranch],
     queryFn: async () => {
       let q = supabase.from("cash_deposits").select("amount, amount_usd, deposit_type").eq("date", today);
-      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      if (effBranch) q = q.eq("branch_id", effBranch);
       const { data, error } = await q;
       if (error) throw error;
       return data;
@@ -84,10 +98,10 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
   });
 
   const { data: attendantCount } = useQuery({
-    queryKey: ["attendant-count", dealerBranchId],
+    queryKey: ["attendant-count", effBranch],
     queryFn: async () => {
       let q = supabase.from("attendants").select("*", { count: "exact", head: true }).eq("is_active", true);
-      if (isDealer && dealerBranchId) q = q.eq("branch_id", dealerBranchId);
+      if (effBranch) q = q.eq("branch_id", effBranch);
       const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
@@ -95,9 +109,9 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
   });
 
   const { data: branchCount } = useQuery({
-    queryKey: ["branch-count", dealerBranchId],
+    queryKey: ["branch-count", effBranch],
     queryFn: async () => {
-      if (isDealer) return 1;
+      if (effBranch) return 1;
       const { count, error } = await supabase.from("branches").select("*", { count: "exact", head: true }).eq("is_active", true);
       if (error) throw error;
       return count ?? 0;
@@ -109,7 +123,7 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
       .channel("tank-alerts")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "tanks" }, (payload) => {
         const tank = payload.new as any;
-        if (isDealer && dealerBranchId && tank.branch_id !== dealerBranchId) return;
+        if (effBranch && tank.branch_id !== effBranch) return;
         const pct = (Number(tank.current_level_usg) / Number(tank.capacity_usg)) * 100;
         const critPct = thresholds?.critical_pct ?? 20;
         if (pct < critPct) {
@@ -118,7 +132,7 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [thresholds, isDealer, dealerBranchId]);
+  }, [thresholds, isDealer, effBranch]);
 
   const pmsTotal = allTanks?.filter(t => t.product_type === "PMS").reduce((sum, t) => sum + Number(t.current_level_usg), 0) ?? 0;
   const agoTotal = allTanks?.filter(t => t.product_type === "AGO").reduce((sum, t) => sum + Number(t.current_level_usg), 0) ?? 0;
@@ -138,12 +152,24 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
     return `${Math.floor(mins / 60)}h ago`;
   };
 
-  const subtitle = isDealer && dealerBranchName
-    ? `${dealerBranchName} — Station Overview`
-    : "Real-time overview of all stations";
+  const scopeName = isDealer ? dealerBranchName : pickedName;
+  const subtitle = scopeName ? `${scopeName} — Station Overview` : "Real-time overview of all stations";
 
   return (
     <AppLayout title="Dashboard" subtitle={subtitle}>
+      <div className="page-stagger">
+      {isAdmin && (
+        <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <span className="text-sm font-medium">Station</span>
+          <Select value={picked} onValueChange={setPicked}>
+            <SelectTrigger className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All stations</SelectItem>
+              {stationList?.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {(tankAlerts.length > 0 || cashVarianceAlert) && (
         <div className="mb-6 space-y-2">
           {tankAlerts.slice(0, 3).map(t => (
@@ -165,9 +191,9 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-grid">
         <MetricCard title="Total Sales Today" value={`$${todaySalesUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={<DollarSign className="h-6 w-6" />} variant="primary" subtitle={todaySalesUsd === 0 ? "No sales recorded yet" : undefined} />
-        <MetricCard title="Total PMS Stock" value={`${pmsTotal.toLocaleString()} USG`} icon={<Fuel className="h-6 w-6" />} subtitle={isDealer ? dealerBranchName ?? "" : "Across all stations"} variant="success" />
-        <MetricCard title="Total AGO Stock" value={`${agoTotal.toLocaleString()} USG`} icon={<Fuel className="h-6 w-6" />} subtitle={isDealer ? dealerBranchName ?? "" : "Across all stations"} variant="warning" />
-        <MetricCard title="Active Attendants" value={String(attendantCount ?? 0)} icon={<Users className="h-6 w-6" />} subtitle={isDealer ? dealerBranchName ?? "" : `Across ${branchCount ?? 0} stations`} />
+        <MetricCard title="Total PMS Stock" value={`${pmsTotal.toLocaleString()} USG`} icon={<Fuel className="h-6 w-6" />} subtitle={scopeName ?? "Across all stations"} variant="success" />
+        <MetricCard title="Total AGO Stock" value={`${agoTotal.toLocaleString()} USG`} icon={<Fuel className="h-6 w-6" />} subtitle={scopeName ?? "Across all stations"} variant="warning" />
+        <MetricCard title="Active Attendants" value={String(attendantCount ?? 0)} icon={<Users className="h-6 w-6" />} subtitle={scopeName ?? `Across ${branchCount ?? 0} stations`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 stagger-grid">
@@ -230,8 +256,9 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
         </div>
       </div>
 
-      {isDealer ? <StationSalesStockCard branchId={dealerBranchId} /> : <NetworkPerformanceCard />}
+      {effBranch ? <StationSalesStockCard branchId={effBranch} /> : <NetworkPerformanceCard />}
       {extra}
+      </div>
     </AppLayout>
   );
 }
