@@ -1,1 +1,2 @@
 - AI features run in Supabase Edge Functions via Lovable AI Gateway (shared helpers in supabase/functions/_shared); data reads use the caller's JWT so RLS scopes what the model sees.
+- Normalize historical payroll with saved-payroll.ts using persisted amounts, never current rates; legacy records may lack a statutory breakdown.

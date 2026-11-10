@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { PayrollLine } from "@/lib/payroll";
+import { savedPayrollLine } from "@/lib/saved-payroll";
 import type { PrintCtx } from "@/pages/Payroll";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export function PayrollHistory({ branches, lockBranch, onPrintSheet, onPrintSlip
     enabled: ids.length > 0,
     queryFn: async () => {
       let q = supabase.from("payroll")
-        .select("month, year, net_salary, details, created_at, employees!inner(full_name, position, gender, branch_id)")
+        .select("month, year, gross_salary, net_salary, days_worked, deductions, other_deductions, details, created_at, employees!inner(full_name, position, gender, branch_id)")
         .eq("year", +year);
       q = effStation === "all" ? q.in("employees.branch_id", ids) : q.eq("employees.branch_id", effStation);
       if (month !== "all") q = q.eq("month", +month);
@@ -71,7 +72,7 @@ export function PayrollHistory({ branches, lockBranch, onPrintSheet, onPrintSlip
         };
         map.set(key, run);
       }
-      run.items.push({ emp: { full_name: r.employees.full_name, position: r.employees.position, gender: r.employees.gender }, line: d as PayrollLine });
+      run.items.push({ emp: { full_name: r.employees.full_name, position: r.employees.position, gender: r.employees.gender }, line: savedPayrollLine(r) });
       run.net += Number(r.net_salary) || 0;
     });
     return [...map.values()].sort((a, b) => b.year - a.year || b.month - a.month || (a.branch?.name ?? "").localeCompare(b.branch?.name ?? ""));
@@ -160,7 +161,7 @@ export function PayrollHistory({ branches, lockBranch, onPrintSheet, onPrintSlip
                 <TableRow>
                   <TableHead>Employee</TableHead><TableHead>Position</TableHead><TableHead className="text-right">Days</TableHead>
                   <TableHead className="text-right">Gross (pr)</TableHead><TableHead className="text-right">Tax + NASCORP</TableHead>
-                  <TableHead className="text-right">Other ded.</TableHead><TableHead className="text-right">Net USD</TableHead><TableHead />
+                  <TableHead className="text-right">Other / unsplit ded.</TableHead><TableHead className="text-right">Net USD</TableHead><TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
