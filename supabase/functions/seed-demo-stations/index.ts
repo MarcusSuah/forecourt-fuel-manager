@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
 
       // 30 days of operations
       const level = tanks!.map((t) => Math.round(Number(t.capacity_usg) * 0.7));
-      const meter = pumpDefs.map(() => Math.round(between(20000, 90000)));
+      const meter = pumpDefs.map(() => Math.round(between(5000, 25000)));
       const today = new Date();
       for (let d = 29; d >= 0; d--) {
         const day = new Date(today); day.setUTCDate(day.getUTCDate() - d);
@@ -120,8 +120,8 @@ Deno.serve(async (req) => {
           const tankSold = tanks!.map(() => 0);
           pumpDefs.forEach((p, pi) => {
             const usg = r2(between(p.product_type === "AGO" ? 120 : 160, p.product_type === "AGO" ? 260 : 340));
-            const liters = usg * 3.785411784;
-            const open = meter[pi]; meter[pi] = r2(open + liters);
+            // Meters are recorded in USG
+            const open = meter[pi]; meter[pi] = r2(open + usg);
             sales.push({ branch_id: branchId, shift_id: shift, date, attendant_id: att, island_id: island!.id, pump_id: pumps![pi].id, opening_meter: open, closing_meter: meter[pi], rtt_usg: 0, unit_price_usd: PRICE[p.product_type as "PMS" | "AGO"] });
             tankSold[p.tank] += usg; shiftUsd += usg * PRICE[p.product_type as "PMS" | "AGO"];
           });
