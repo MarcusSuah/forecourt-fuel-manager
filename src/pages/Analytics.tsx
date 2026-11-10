@@ -205,14 +205,14 @@ export default function Analytics() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-grid">
         <MetricCard title="Total Volume" value={`${kpis.totalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })} USG`} icon={<Fuel className="h-6 w-6" />} trend={{ value: Math.round(kpis.volumeTrend * 10) / 10, label: "vs prev period" }} variant="primary" />
         <MetricCard title="Total Revenue" value={`$${kpis.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={<DollarSign className="h-6 w-6" />} trend={{ value: Math.round(kpis.revenueTrend * 10) / 10, label: "vs prev period" }} variant="success" />
         <MetricCard title="Avg Daily Revenue" value={`$${kpis.avgDailyRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={<BarChart3 className="h-6 w-6" />} subtitle="Per day average" />
         <MetricCard title="Collection Rate" value={`${kpis.collectionRate.toFixed(1)}%`} icon={<Activity className="h-6 w-6" />} variant={kpis.collectionRate >= 95 ? "success" : kpis.collectionRate >= 85 ? "warning" : "danger"} subtitle={`${kpis.lowTanks} tank(s) low`} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-grid">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-base">Volume Trend (USG)</CardTitle></CardHeader>
           <CardContent>
@@ -267,7 +267,7 @@ export default function Analytics() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 stagger-grid">
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -326,7 +326,7 @@ export default function Analytics() {
           {topAttendants.length === 0 ? (
             <p className="text-muted-foreground text-sm py-8 text-center">No data</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 stagger-grid">
               {topAttendants.map((a, i) => (
                 <div key={a.name} className="flex flex-col items-center p-4 rounded-lg bg-muted/50 border">
                   <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm mb-2", i === 0 ? "bg-primary/20 text-primary" : "bg-muted-foreground/10 text-muted-foreground")}>

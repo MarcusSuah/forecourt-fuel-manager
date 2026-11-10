@@ -99,7 +99,7 @@ export default function AdminAnalytics() {
               </Select>
             </div>
             <Tabs value={g} onValueChange={(v) => setG(v as Granularity)}>
-              <TabsList className="grid w-full grid-cols-4 sm:w-auto">
+              <TabsList className="grid w-full grid-cols-4 sm:w-auto stagger-grid">
                 <TabsTrigger value="day">Day</TabsTrigger><TabsTrigger value="week">Week</TabsTrigger>
                 <TabsTrigger value="month">Month</TabsTrigger><TabsTrigger value="year">Year</TabsTrigger>
               </TabsList>
@@ -108,17 +108,17 @@ export default function AdminAnalytics() {
         </div>
 
         {isLoading || !a ? (
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />)}</div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 stagger-grid">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />)}</div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 stagger-grid">
               <MetricCard title="Total sales" value={usd(a.t.revenue)} icon={<DollarSign className="h-4 w-4" />} variant="primary" />
               <MetricCard title="Cash deposited" value={usd(a.t.cash)} subtitle={`Gap ${usd(a.t.revenue - a.t.cash)}`} icon={<Wallet className="h-4 w-4" />} />
               <MetricCard title="Volume sold" value={`${n0(a.t.volume)} USG`} icon={<Fuel className="h-4 w-4" />} variant="success" />
               <MetricCard title="Fuel received" value={`${n0(a.t.delivered)} USG`} icon={<Truck className="h-4 w-4" />} />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 stagger-grid">
               <Chart title="Sales vs cash deposits" desc="USD">
                 <ComposedChart data={a.series}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />

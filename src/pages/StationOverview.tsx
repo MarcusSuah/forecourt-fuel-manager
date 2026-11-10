@@ -163,14 +163,14 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-grid">
         <MetricCard title="Total Sales Today" value={`$${todaySalesUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={<DollarSign className="h-6 w-6" />} variant="primary" subtitle={todaySalesUsd === 0 ? "No sales recorded yet" : undefined} />
         <MetricCard title="Total PMS Stock" value={`${pmsTotal.toLocaleString()} USG`} icon={<Fuel className="h-6 w-6" />} subtitle={isDealer ? dealerBranchName ?? "" : "Across all stations"} variant="success" />
         <MetricCard title="Total AGO Stock" value={`${agoTotal.toLocaleString()} USG`} icon={<Fuel className="h-6 w-6" />} subtitle={isDealer ? dealerBranchName ?? "" : "Across all stations"} variant="warning" />
         <MetricCard title="Active Attendants" value={String(attendantCount ?? 0)} icon={<Users className="h-6 w-6" />} subtitle={isDealer ? dealerBranchName ?? "" : `Across ${branchCount ?? 0} stations`} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 stagger-grid">
         <div className="lg:col-span-2"><SalesChart /></div>
         <div>
           <CashSummary
@@ -182,16 +182,16 @@ export default function StationOverview({ extra }: { extra?: ReactNode } = {}) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 stagger-grid">
         <div className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Tank Status</h2>
             <a href="/tanks" className="text-sm text-primary hover:underline">View all tanks</a>
           </div>
           {tanksLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-72 rounded-xl" />)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-grid">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-72 rounded-xl" />)}</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-grid">
               {(tanks ?? []).map((tank) => (
                 <TankCard key={tank.id} name={tank.name} product={tank.product_type} capacity={Number(tank.capacity_usg)} currentLevel={Number(tank.current_level_usg)} branch={(tank.branches as any)?.name ?? "Unknown"} lastUpdated={getTimeSince(tank.updated_at)} />
               ))}

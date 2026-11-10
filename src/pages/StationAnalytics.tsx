@@ -248,7 +248,7 @@ export default function StationAnalytics() {
               </div>
             )}
             <Tabs value={g} onValueChange={(v) => setG(v as Granularity)}>
-              <TabsList className="grid w-full grid-cols-4 sm:w-auto">
+              <TabsList className="grid w-full grid-cols-4 sm:w-auto stagger-grid">
                 <TabsTrigger value="day">Day</TabsTrigger>
                 <TabsTrigger value="week">Week</TabsTrigger>
                 <TabsTrigger value="month">Month</TabsTrigger>
@@ -259,10 +259,10 @@ export default function StationAnalytics() {
         </div>
 
         {(isLoading || !a) ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />)}</div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-grid">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />)}</div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 stagger-grid">
               <MetricCard title="Sales revenue" value={usd(a.totals.revenue)} icon={<DollarSign className="h-4 w-4" />} variant="primary" />
               <MetricCard title="Cash deposited" value={usd(a.totals.cash)} subtitle={`Gap ${usd(a.totals.revenue - a.totals.cash)}`} icon={<Wallet className="h-4 w-4" />} />
               <MetricCard title="Fuel received" value={`${n0(a.totals.delivered)} USG`} icon={<Truck className="h-4 w-4" />} variant="success" />
@@ -535,7 +535,7 @@ export default function StationAnalytics() {
             </Section>
 
             <Section title="Payroll">
-              <div className="grid grid-cols-3 gap-3 md:col-span-2 xl:col-span-3">
+              <div className="grid grid-cols-3 gap-3 md:col-span-2 xl:col-span-3 stagger-grid">
                 <MetricCard title="Payroll runs" value={a.payroll.periods} subtitle="Pay periods saved" />
                 <MetricCard title="Staff paid" value={a.payroll.staff} />
                 <MetricCard title="Net pay" value={usd(a.payroll.net)} variant="primary" />
@@ -569,7 +569,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{children}</div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 stagger-grid">{children}</div>
     </section>
   );
 }

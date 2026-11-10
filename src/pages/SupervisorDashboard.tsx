@@ -119,7 +119,7 @@ export default function SupervisorDashboard() {
       )}
 
       {/* Roll-up */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stagger-grid">
         <MetricCard title="Sales Today" value={`$${totalSalesUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`} icon={<DollarSign className="h-6 w-6" />} variant="primary" />
         <MetricCard title="Volume Sold" value={`${totalUsg.toLocaleString(undefined, { maximumFractionDigits: 0 })} USG`} icon={<Fuel className="h-6 w-6" />} variant="success" />
         <MetricCard title="Avg Tank Fill" value={`${avgFill.toFixed(0)}%`} icon={<Fuel className="h-6 w-6" />} variant="warning" />
@@ -132,7 +132,7 @@ export default function SupervisorDashboard() {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Stations in {zoneLabel} zone</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-grid">
             {perBranch.map((b) => (
               <Card key={b.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
@@ -155,7 +155,7 @@ export default function SupervisorDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 stagger-grid">
                     <div>
                       <p className="text-[11px] uppercase text-muted-foreground">Sales today</p>
                       <p className="text-lg font-semibold">${b.sales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
@@ -186,7 +186,7 @@ export default function SupervisorDashboard() {
           <CardHeader>
             <CardTitle className="text-base">Quick links (read-only)</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 stagger-grid">
             <Button variant="outline" asChild><Link to="/tanks">Tanks</Link></Button>
             <Button variant="outline" asChild><Link to="/shift-stock-report">Shift Report</Link></Button>
             <Button variant="outline" asChild><Link to="/cash">Cash Reports</Link></Button>
