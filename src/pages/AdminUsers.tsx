@@ -191,7 +191,7 @@ export default function AdminUsers() {
   };
 
   const [seeding, setSeeding] = useState(false);
-  const runSeed = async (fn: "seed-branch-dealers" | "seed-zone-supervisors") => {
+  const runSeed = async (fn: "seed-branch-dealers" | "seed-zone-supervisors" | "seed-demo-stations") => {
     setSeeding(true);
     try {
       const { data, error } = await supabase.functions.invoke(fn);
@@ -243,6 +243,9 @@ export default function AdminUsers() {
           </Button>
           <Button variant="outline" onClick={() => runSeed("seed-zone-supervisors")} disabled={seeding}>
             Seed missing supervisors
+          </Button>
+          <Button variant="outline" onClick={() => runSeed("seed-demo-stations")} disabled={seeding}>
+            {seeding ? "Seeding…" : "Add 5 demo stations with data"}
           </Button>
         </CardContent>
       </Card>

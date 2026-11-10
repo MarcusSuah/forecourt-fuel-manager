@@ -163,7 +163,8 @@ Deno.serve(async (req) => {
 
       results.push({ station: st.name, email, status: "created" });
     }
-    return json({ ok: true, password: "(default dealer password)", results });
+    const made = results.filter((r: any) => r.status === "created").length;
+    return json({ ok: true, message: `${made} demo station(s) created`, results });
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);
