@@ -219,7 +219,7 @@ export default function StationAnalytics() {
   const top = a?.attendants[0];
 
   return (
-    <AppLayout>
+    <AppLayout title="Station Analytics">
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
