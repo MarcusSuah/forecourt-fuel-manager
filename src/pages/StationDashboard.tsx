@@ -104,7 +104,7 @@ export default function StationDashboard() {
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" /></div>
         </div>
 
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 stagger-grid">
           <MetricCard title="Sales" value={usd(sales.usd)} icon={<DollarSign className="h-5 w-5" />} />
           <MetricCard title="PMS sold (USG)" value={n2(sales.PMS)} icon={<Fuel className="h-5 w-5" />} />
           <MetricCard title="AGO sold (USG)" value={n2(sales.AGO)} icon={<Fuel className="h-5 w-5" />} />
@@ -177,7 +177,7 @@ export default function StationDashboard() {
           </CardHeader>
           <CardContent>
             {!payroll ? <p className="text-sm text-muted-foreground">No payroll saved for this station yet.</p> : (
-              <div className="grid gap-4 grid-cols-2 md:grid-cols-5 text-sm">
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-5 text-sm stagger-grid">
                 <div><p className="text-muted-foreground">Period</p><p className="font-semibold">{MONTHS[payroll.month - 1]} {payroll.year}</p></div>
                 <div><p className="text-muted-foreground">Employees</p><p className="font-semibold">{payroll.employees}</p></div>
                 <div><p className="text-muted-foreground">Gross</p><p className="font-semibold">{usd(payroll.gross)}</p></div>

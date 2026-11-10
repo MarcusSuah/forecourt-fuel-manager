@@ -16,7 +16,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { fetchAll } from "@/lib/fetch-all";
-import { allBuckets, bucketKey, bucketLabel, rangeFor, tankDaySales, type Granularity } from "@/lib/analytics-buckets";
+import { buildSegments, stockGaps, pumpEfficiency } from "@/lib/analytics-model";
+import { allBuckets, bucketKey, bucketLabel, rangeFor, type Granularity } from "@/lib/analytics-buckets";
 
 const C = {
   pms: "hsl(var(--primary))",
@@ -76,15 +77,18 @@ export default function StationAnalytics() {
     queryKey: ["station-analytics", branchId, fromIso, toIso],
     enabled: !!branchId,
     queryFn: async () => {
-      const [tanks, pumps, dips, deliveries, sales, cash] = await Promise.all([
+      const [tanks, pumps, dips, deliveries, sales, cash, payroll] = await Promise.all([
         fetchAll<any>((a, b) => supabase.from("tanks").select("id, name, product_type, capacity_usg, current_level_usg, threshold_usg, status, is_active").eq("branch_id", branchId).range(a, b)),
         fetchAll<any>((a, b) => supabase.from("pumps").select("id, name, product_type, is_active").eq("branch_id", branchId).range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("stock_readings").select("tank_id, date, physical_level_usg, theoretical_level_usg, created_at, shifts(name)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).order("created_at").range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("stock_readings").select("tank_id, date, shift_id, physical_level_usg, theoretical_level_usg, created_at, shifts(name)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).order("created_at").range(a, b)),
         fetchAll<any>((a, b) => supabase.from("fuel_deliveries").select("tank_id, delivery_date, quantity_usg, supplier").eq("branch_id", branchId).gte("delivery_date", fromIso).lte("delivery_date", toIso).range(a, b)),
-        fetchAll<any>((a, b) => supabase.from("shift_sales_reports").select("date, pump_id, attendant_id, opening_meter, closing_meter, sales_usg, total_sales_usd, shifts(name), attendants(full_name), pumps(name, product_type)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("shift_sales_reports").select("date, pump_id, shift_id, attendant_id, opening_meter, closing_meter, sales_usg, total_sales_usd, shifts(name), attendants(full_name), pumps(name, product_type)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).range(a, b)),
         fetchAll<any>((a, b) => supabase.from("cash_deposits").select("date, amount, amount_usd, exchange_rate, deposit_type, attendant_id, shifts(name), attendants(full_name)").eq("branch_id", branchId).gte("date", fromIso).lte("date", toIso).range(a, b)),
+        fetchAll<any>((a, b) => supabase.from("payroll").select("month, year, net_salary, gross_salary, employee_id, employees!inner(branch_id)").eq("employees.branch_id", branchId).gte("year", from.getFullYear()).range(a, b)),
       ]);
-      return { tanks, pumps, dips, deliveries, sales, cash };
+      const pumpIds = pumps.map((p: any) => p.id);
+      const assignments = pumpIds.length ? await fetchAll<any>((a, b) => supabase.from("tank_pump_assignments").select("pump_id, tank_id").in("pump_id", pumpIds).range(a, b)) : [];
+      return { tanks, pumps, dips, deliveries, sales, cash, payroll, assignments };
     },
   });
 
@@ -109,26 +113,41 @@ export default function StationAnalytics() {
       delTankDay[`${d.tank_id}|${d.delivery_date}`] = (delTankDay[`${d.tank_id}|${d.delivery_date}`] ?? 0) + q;
     });
 
-    // Dips: opening/closing per tank-day, then tank sales
-    const tankDay: Record<string, { tank: string; date: string; levels: number[]; theo: number[] }> = {};
-    data.dips.forEach((r: any) => {
-      const id = `${r.tank_id}|${r.date}`;
-      (tankDay[id] ??= { tank: r.tank_id, date: r.date, levels: [], theo: [] });
-      tankDay[id].levels.push(Number(r.physical_level_usg) || 0);
-      tankDay[id].theo.push(Number(r.theoretical_level_usg) || 0);
-    });
+    // Dips → shift segments via the independent analytics model
+    const pumpTanks: Record<string, string[]> = {};
+    data.assignments.forEach((x: any) => (pumpTanks[x.pump_id] ??= []).push(x.tank_id));
+    const meterRows = data.sales.map((r: any) => ({ pumpId: r.pump_id, date: r.date, shiftKey: r.shift_id, usg: Number(r.sales_usg) || 0 }));
+    const segments = buildSegments(
+      data.dips.map((r: any, i: number) => ({ tankId: r.tank_id, date: r.date, shiftKey: r.shift_id ?? "", level: Number(r.physical_level_usg) || 0, order: i })),
+      data.deliveries.map((d: any) => ({ tankId: d.tank_id, date: d.delivery_date, qty: Number(d.quantity_usg) || 0 })),
+      meterRows, pumpTanks,
+    );
     const openB = init(), closeB = init(), physB = init(), theoB = init(), dipCount = init();
-    const tSalesPms = init(), tSalesAgo = init();
+    const tSalesPms = init(), tSalesAgo = init(), modelVar = init();
     const tankSalesByTank: Record<string, number> = {};
-    Object.values(tankDay).forEach((td) => {
-      const k = bucketKey(g, td.date); if (!(k in openB)) return;
-      openB[k] += td.levels[0]; closeB[k] += td.levels[td.levels.length - 1];
-      physB[k] += td.levels.reduce((s, x) => s + x, 0); theoB[k] += td.theo.reduce((s, x) => s + x, 0);
-      dipCount[k] += td.levels.length;
-      const s = tankDaySales(td.levels, delTankDay[`${td.tank}|${td.date}`] ?? 0);
-      (prodOf(td.tank) === "AGO" ? tSalesAgo : tSalesPms)[k] += s;
-      tankSalesByTank[td.tank] = (tankSalesByTank[td.tank] ?? 0) + s;
+    data.dips.forEach((r: any) => {
+      const k = bucketKey(g, r.date); if (!(k in physB)) return;
+      physB[k] += Number(r.physical_level_usg) || 0; theoB[k] += Number(r.theoretical_level_usg) || 0; dipCount[k] += 1;
     });
+    segments.forEach((sg) => {
+      const k = bucketKey(g, sg.date); if (!(k in openB)) return;
+      openB[k] += sg.opening; closeB[k] += sg.closing; modelVar[k] += sg.variance;
+      (prodOf(sg.tankId) === "AGO" ? tSalesAgo : tSalesPms)[k] += sg.tankSales;
+      tankSalesByTank[sg.tankId] = (tankSalesByTank[sg.tankId] ?? 0) + sg.tankSales;
+    });
+    const pumpName = new Map(data.pumps.map((p: any) => [p.id, p]));
+    const efficiency = pumpEfficiency(meterRows).map((e) => ({ ...e, name: (pumpName.get(e.pumpId) as any)?.name ?? "Pump", product: (pumpName.get(e.pumpId) as any)?.product_type, eff: Math.round(e.utilisationPct) }));
+    const gaps = stockGaps(segments).map((gp) => ({ ...gp, name: (tankById.get(gp.tankId) as any)?.name ?? "Tank", gap: Math.round(gp.cumulativeGap), pct: Math.round(gp.gapPct * 100) / 100 }));
+
+    // Payroll per bucket (month resolution)
+    const payRuns = init(), payNet = init();
+    const payStaff: Record<string, Set<string>> = {};
+    data.payroll.forEach((p: any) => {
+      const k = bucketKey(g, `${p.year}-${String(p.month).padStart(2, "0")}-01`); if (!(k in payNet)) return;
+      payNet[k] += Number(p.net_salary) || 0;
+      (payStaff[k] ??= new Set()).add(p.employee_id);
+    });
+    Object.keys(payStaff).forEach((k) => { payRuns[k] = 1; });
 
     // Meter / pump sales
     const mPms = init(), mAgo = init(), revenue = init(), readings = init();
@@ -169,7 +188,8 @@ export default function StationAnalytics() {
         opening: openB[k], closing: closeB[k], physical: physB[k], theoretical: theoB[k], dips: dipCount[k],
         tPms, tAgo, mPms: mPms[k], mAgo: mAgo[k], readings: readings[k], revenue: revenue[k], cash: cashB[k],
         gap: revenue[k] - cashB[k],
-        variance: tPms + tAgo - (mPms[k] + mAgo[k]),
+        variance: modelVar[k],
+        payNet: payNet[k], payStaff: payStaff[k]?.size ?? 0,
       };
     });
 
@@ -195,7 +215,8 @@ export default function StationAnalytics() {
 
     const sum = (f: (r: typeof series[number]) => number) => series.reduce((s, r) => s + f(r), 0);
     return {
-      series, tankStatus, stockControl, pumpMgmt, attendants, shifts,
+      series, tankStatus, stockControl, efficiency, gaps,
+      payroll: { net: data.payroll.reduce((x: number, p: any) => x + (Number(p.net_salary) || 0), 0), periods: new Set(data.payroll.map((p: any) => `${p.year}-${p.month}`)).size, staff: new Set(data.payroll.map((p: any) => p.employee_id)).size }, pumpMgmt, attendants, shifts,
       suppliers: Object.entries(bySupplier).map(([name, value]) => ({ name, value: Math.round(value) })),
       pumps: Object.values(pumpSales).sort((x, y) => y.usg - x.usg),
       totals: {
@@ -210,7 +231,7 @@ export default function StationAnalytics() {
 
   return (
     <AppLayout title="Station Analytics">
-      <div className="space-y-6">
+      <div className="page-stagger space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Station Analytics</h1>
@@ -227,7 +248,7 @@ export default function StationAnalytics() {
               </div>
             )}
             <Tabs value={g} onValueChange={(v) => setG(v as Granularity)}>
-              <TabsList className="grid w-full grid-cols-4 sm:w-auto">
+              <TabsList className="grid w-full grid-cols-4 sm:w-auto stagger-grid">
                 <TabsTrigger value="day">Day</TabsTrigger>
                 <TabsTrigger value="week">Week</TabsTrigger>
                 <TabsTrigger value="month">Month</TabsTrigger>
@@ -238,10 +259,10 @@ export default function StationAnalytics() {
         </div>
 
         {(isLoading || !a) ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />)}</div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-grid">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />)}</div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 stagger-grid">
               <MetricCard title="Sales revenue" value={usd(a.totals.revenue)} icon={<DollarSign className="h-4 w-4" />} variant="primary" />
               <MetricCard title="Cash deposited" value={usd(a.totals.cash)} subtitle={`Gap ${usd(a.totals.revenue - a.totals.cash)}`} icon={<Wallet className="h-4 w-4" />} />
               <MetricCard title="Fuel received" value={`${n0(a.totals.delivered)} USG`} icon={<Truck className="h-4 w-4" />} variant="success" />
@@ -473,6 +494,65 @@ export default function StationAnalytics() {
               </Card>
             </Section>
 
+            <Section title="Analytics model: variance, stock gaps & pump efficiency">
+              <ChartCard title="Stock gaps per tank" desc="Cumulative tank sales − meter sales (USG). Positive = unexplained loss">
+                {a.gaps.length ? (
+                  <ResponsiveContainer>
+                    <BarChart data={a.gaps}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" {...axis} /><YAxis {...axis} width={50} />
+                      <Tooltip {...tip} formatter={(v: number, _n, p: any) => [`${n0(v)} USG (${p.payload.pct}% of throughput)`, "Gap"]} />
+                      <ReferenceLine y={0} stroke={C.muted} />
+                      <Bar dataKey="gap" radius={[4, 4, 4, 4]} {...ANIM}>
+                        {a.gaps.map((gp, i) => <Cell key={i} fill={Math.abs(gp.pct) > 2 ? C.bad : gp.gap > 0 ? C.warn : C.ok} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : <Empty />}
+              </ChartCard>
+              <ChartCard title="Pump efficiency" desc="Average USG per shift vs the busiest pump (100%)">
+                {a.efficiency.length ? (
+                  <ResponsiveContainer>
+                    <RadialBarChart innerRadius="25%" outerRadius="100%" data={a.efficiency.map((e) => ({ ...e, fill: e.product === "AGO" ? C.ago : C.pms }))} startAngle={90} endAngle={-270}>
+                      <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                      <RadialBar dataKey="eff" background cornerRadius={6} {...ANIM} />
+                      <Legend iconSize={8} formatter={(_v, e: any) => `${e.payload.name} ${e.payload.eff}%`} wrapperStyle={{ fontSize: 11 }} />
+                      <Tooltip {...tip} formatter={(v: number, _n, p: any) => [`${v}% · ${n0(p.payload.avgPerShift)} USG/shift`, p.payload.name]} />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                ) : <Empty />}
+              </ChartCard>
+              <ChartCard title="Variance trend" desc="Model variance per period (USG)">
+                <ResponsiveContainer>
+                  <LineChart data={a.series}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis dataKey="label" {...axis} /><YAxis {...axis} width={50} />
+                    <Tooltip {...tip} /><ReferenceLine y={0} stroke={C.muted} />
+                    <Line type="monotone" dataKey="variance" name="Variance" stroke={C.bad} strokeWidth={2} dot={false} {...ANIM} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Section>
+
+            <Section title="Payroll">
+              <div className="grid grid-cols-3 gap-3 md:col-span-2 xl:col-span-3 stagger-grid">
+                <MetricCard title="Payroll runs" value={a.payroll.periods} subtitle="Pay periods saved" />
+                <MetricCard title="Staff paid" value={a.payroll.staff} />
+                <MetricCard title="Net pay" value={usd(a.payroll.net)} variant="primary" />
+              </div>
+              <ChartCard title="Net pay & staff count per period" desc="From saved payroll runs" className="md:col-span-2 xl:col-span-3">
+                <ResponsiveContainer>
+                  <ComposedChart data={a.series}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis dataKey="label" {...axis} /><YAxis yAxisId="l" {...axis} width={55} /><YAxis yAxisId="r" orientation="right" allowDecimals={false} {...axis} width={30} />
+                    <Tooltip {...tip} /><Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar yAxisId="l" dataKey="payNet" name="Net pay ($)" fill={C.pms} radius={[4, 4, 0, 0]} {...ANIM} />
+                    <Line yAxisId="r" type="monotone" dataKey="payStaff" name="Staff" stroke={C.ago} strokeWidth={2} {...ANIM} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Section>
+
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <Badge variant="outline" className="gap-1"><Fuel className="h-3 w-3" /> PMS meter {n0(a.meterByProduct.PMS)} USG</Badge>
               <Badge variant="outline" className="gap-1"><Droplets className="h-3 w-3" /> AGO meter {n0(a.meterByProduct.AGO)} USG</Badge>
@@ -489,7 +569,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">{title}</h2>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{children}</div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 stagger-grid">{children}</div>
     </section>
   );
 }

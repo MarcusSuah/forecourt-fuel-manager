@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     const { data: shifts } = await admin.from("shifts").select("id, name");
     const shiftId = (n: string) => shifts!.find((s) => s.name === n)!.id;
-    const dayShifts = [shiftId("Morning"), shiftId("Night")];
+    const dayShifts = [shiftId("Morning"), shiftId("Afternoon"), shiftId("Night")];
     const { data: allUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
 
     const results: unknown[] = [];
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
 
       // 30 days of operations
       const level = tanks!.map((t) => Math.round(Number(t.capacity_usg) * 0.7));
-      const meter = pumpDefs.map(() => Math.round(between(20000, 90000)));
+      const meter = pumpDefs.map(() => Math.round(between(5000, 25000)));
       const today = new Date();
       for (let d = 29; d >= 0; d--) {
         const day = new Date(today); day.setUTCDate(day.getUTCDate() - d);
@@ -114,21 +114,20 @@ Deno.serve(async (req) => {
 
         const dips: any[] = []; const sales: any[] = []; const cash: any[] = [];
         dayShifts.forEach((shift, sIdx) => {
-          const opening = [...level];
+          const opening = [...level]; // previous shift's closing dip carries over
           const att = atts![(sIdx + d) % atts!.length].id;
           let shiftUsd = 0;
           const tankSold = tanks!.map(() => 0);
           pumpDefs.forEach((p, pi) => {
             const usg = r2(between(p.product_type === "AGO" ? 120 : 160, p.product_type === "AGO" ? 260 : 340));
-            const liters = usg * 3.785411784;
-            const open = meter[pi]; meter[pi] = r2(open + liters);
+            // Meters are recorded in USG
+            const open = meter[pi]; meter[pi] = r2(open + usg);
             sales.push({ branch_id: branchId, shift_id: shift, date, attendant_id: att, island_id: island!.id, pump_id: pumps![pi].id, opening_meter: open, closing_meter: meter[pi], rtt_usg: 0, unit_price_usd: PRICE[p.product_type as "PMS" | "AGO"] });
             tankSold[p.tank] += usg; shiftUsd += usg * PRICE[p.product_type as "PMS" | "AGO"];
           });
           tanks!.forEach((t, ti) => {
             const loss = between(-4, 12); // evaporation / small variance
             const closing = Math.max(0, Math.round(opening[ti] - tankSold[ti] - loss));
-            if (sIdx === 0) dips.push({ tank_id: t.id, branch_id: branchId, date, shift_id: shift, physical_level_usg: opening[ti], theoretical_level_usg: opening[ti], notes: "Opening dip" });
             dips.push({ tank_id: t.id, branch_id: branchId, date, shift_id: shift, physical_level_usg: closing, theoretical_level_usg: Math.max(0, Math.round(opening[ti] - tankSold[ti])), notes: "Closing dip" });
             level[ti] = closing;
           });

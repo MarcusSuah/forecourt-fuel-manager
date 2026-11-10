@@ -137,7 +137,7 @@ export function StationSalesStockCard({ branchId }: { branchId: string | null })
     <div className="mt-6 grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Fuel className="h-5 w-5 text-primary" />Station Sales (Today)</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+        <CardContent className="grid grid-cols-2 gap-4 stagger-grid">
           {[{ k: "PMS", v: pms }, { k: "AGO", v: ago }].map(({ k, v }) => (
             <div key={k} className="rounded-lg border p-4">
               <p className="text-sm text-muted-foreground">{k}</p>
@@ -193,7 +193,7 @@ export function ZoneAlertsCard() {
   return (
     <Card className="mt-6">
       <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-destructive" />Zone Shift &amp; Stock Alerts</CardTitle></CardHeader>
-      <CardContent className="grid gap-6 md:grid-cols-3">
+      <CardContent className="grid gap-6 md:grid-cols-3 stagger-grid">
         <section>
           <h4 className="mb-2 text-sm font-semibold">Low / critical tanks ({lowTanks.length})</h4>
           <ul className="space-y-1 text-sm">
