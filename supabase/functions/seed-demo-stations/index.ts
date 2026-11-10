@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     const { data: shifts } = await admin.from("shifts").select("id, name");
     const shiftId = (n: string) => shifts!.find((s) => s.name === n)!.id;
-    const dayShifts = [shiftId("Morning"), shiftId("Night")];
+    const dayShifts = [shiftId("Morning"), shiftId("Afternoon"), shiftId("Night")];
     const { data: allUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
 
     const results: unknown[] = [];
@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
 
         const dips: any[] = []; const sales: any[] = []; const cash: any[] = [];
         dayShifts.forEach((shift, sIdx) => {
-          const opening = [...level];
+          const opening = [...level]; // previous shift's closing dip carries over
           const att = atts![(sIdx + d) % atts!.length].id;
           let shiftUsd = 0;
           const tankSold = tanks!.map(() => 0);
@@ -128,7 +128,6 @@ Deno.serve(async (req) => {
           tanks!.forEach((t, ti) => {
             const loss = between(-4, 12); // evaporation / small variance
             const closing = Math.max(0, Math.round(opening[ti] - tankSold[ti] - loss));
-            if (sIdx === 0) dips.push({ tank_id: t.id, branch_id: branchId, date, shift_id: shift, physical_level_usg: opening[ti], theoretical_level_usg: opening[ti], notes: "Opening dip" });
             dips.push({ tank_id: t.id, branch_id: branchId, date, shift_id: shift, physical_level_usg: closing, theoretical_level_usg: Math.max(0, Math.round(opening[ti] - tankSold[ti])), notes: "Closing dip" });
             level[ti] = closing;
           });
