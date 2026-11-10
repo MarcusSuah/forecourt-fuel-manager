@@ -38,7 +38,7 @@ const navigation = [
   { name: "Financial", href: "/financial-situation", icon: Landmark, permission: "financials.view" },
   { name: "Reports", href: "/reports", icon: FileBarChart, permission: "reports.view" },
   { name: "Attendants", href: "/attendants", icon: Users, permission: "attendants.view" },
-  { name: "Analytics", href: "/analytics", icon: TrendingUp, permission: null },
+  { name: "Analytics", href: "/analytics", icon: TrendingUp, permission: "analytics.view" },
   { name: "Admin Analytics", href: "/admin-analytics", icon: TrendingUp, permission: "admin.manage" },
   { name: "Permissions", href: "/permissions", icon: Lock, permission: "permissions.manage" },
   { name: "Admin", href: "/admin", icon: ShieldCheck, permission: "admin.manage" },
@@ -108,6 +108,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     // Role-based route allow-list
     if (user?.role === "dealer" && !DEALER_ALLOWED.has(item.href)) return false;
     if (user?.role === "supervisor" && !SUPERVISOR_ALLOWED.has(item.href)) return false;
+    // Dealers always see analytics for their own station
+    if (user?.role === "dealer" && item.href === "/analytics") return true;
     // Items with no permission are visible (subject to role allow-list above)
     if (!item.permission) return true;
     // Check permission

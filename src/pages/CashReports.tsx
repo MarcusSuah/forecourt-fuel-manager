@@ -134,6 +134,7 @@ export default function CashReports() {
       }
       setRows([emptyRow(defaultExchangeRate)]);
       queryClient.invalidateQueries({ queryKey: ["cash-deposits"] });
+      ["station-analytics", "admin-analytics", "analytics-cash"].forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
     onError: (err: Error) => toast.error("Failed: " + err.message),
   });
